@@ -74,3 +74,17 @@ public class UnattendBuilderTests
     Assert.DoesNotContain("e9a42b02-d5df-448d-aa00-03f14749eb61", xml); // sem "Desempenho Máximo"
   }
 }
+
+public class WipeDiskTests
+{
+  [Fact]
+  public void Padrao_pergunta_o_disco_e_o_modo_teste_apaga_o_disco_0()
+  {
+    string normal = System.Text.Encoding.UTF8.GetString(new UnattendBuilder().BuildBytes(new DebloatOptions()));
+    Assert.DoesNotContain("diskpart", normal, StringComparison.OrdinalIgnoreCase);
+
+    string wipe = System.Text.Encoding.UTF8.GetString(new UnattendBuilder().BuildBytes(new DebloatOptions { WipeDisk0 = true }));
+    Assert.Contains("diskpart", wipe, StringComparison.OrdinalIgnoreCase);
+    Assert.Contains("install.swm", wipe);
+  }
+}

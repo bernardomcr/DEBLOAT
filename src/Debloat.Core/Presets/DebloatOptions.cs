@@ -17,6 +17,9 @@ public record DebloatOptions
   public string TimeZone { get; init; } = "E. South America Standard Time";
   public string Edition { get; init; } = "pro";             // chave genérica do Pro
 
+  /// <summary>Apaga o disco 0 e instala sem perguntar. Só para máquina virtual/teste: o padrão é escolher o disco na tela.</summary>
+  public bool WipeDisk0 { get; init; }
+
   // Hardware do PC (decide Hello, caneta, hibernação, Localizar Dispositivo)
   public HardwareProfile Hardware { get; init; } = HardwareProfile.Desktop;
 

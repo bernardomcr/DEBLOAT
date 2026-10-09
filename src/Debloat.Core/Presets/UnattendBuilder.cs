@@ -41,9 +41,18 @@ public sealed class UnattendBuilder
       PasswordExpirationSettings = new UnlimitedPasswordExpirationSettings(),
       TimeZoneSettings = new ExplicitTimeZoneSettings(generator.Lookup<TimeOffset>(options.TimeZone)),
       WifiSettings = new SkipWifiSettings(),
-      PESettings = new DefaultPESettings(
-        EditionSettings: new UnattendedEditionSettings(generator.Lookup<WindowsEdition>(options.Edition)),
-        BypassRequirementsCheck: true),
+      PESettings = options.WipeDisk0
+        ? new GeneratePESettings(
+            PartitionSettings: new UnattendedPartitionSettings(
+              new GeneratedTargetDiskSettings(index: 0, assertNoPartitions: false), PartitionLayout.GPT, RecoveryMode.Partition),
+            InstallFromSettings: new IndexInstallFromSettings(1),     // a mídia do DEBLOAT só tem a edição escolhida
+            PagingFileSettings: new AutomaticPagingFileSettings(),
+            DisableDefender: false, Disable8Dot3Names: false, PauseBeforeFormatting: false, PauseBeforeReboot: false,
+            CompactOs: false, SkipIntegrityCheck: false)
+        : new DefaultPESettings(
+            EditionSettings: new UnattendedEditionSettings(generator.Lookup<WindowsEdition>(options.Edition)),
+            BypassRequirementsCheck: true),
+      ActivationKey = options.WipeDisk0 ? new ProductKey(GenericKeys[options.Edition]) : null,
       Bloatwares = options.Bloatware.Select(generator.Lookup<Bloatware>).ToImmutableList(),
       ExpressSettings = ExpressSettingsMode.DisableAll,
       ScriptSettings = new ScriptSettings(Scripts(options, apps), RestartExplorer: true),
@@ -117,6 +126,9 @@ public sealed class UnattendBuilder
     scripts.Add(new(firstLogon, ScriptPhase.FirstLogon, ScriptType.Ps1));
     return scripts;
   }
+
+  /// <summary>Chaves genéricas de instalação (não ativam; servem para escolher a edição).</summary>
+  private static readonly Dictionary<string, string> GenericKeys = new() { ["pro"] = "VK7JG-NPHTM-C97JM-9MPGT-3V66T" };
 
   public static string DnsToken(DnsChoice dns) => dns switch
   {

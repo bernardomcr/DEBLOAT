@@ -15,7 +15,7 @@ public static class IsoWriter
   private const int MediaTypeBdr = 0x13;      // BD-R: tira o limite de tamanho de DVD
   private const byte PlatformX86 = 0, PlatformEfi = 0xEF;
 
-  public static void Write(string mediaDir, string isoPath, string volumeName = "DEBLOAT_WIN11")
+  public static void Write(string mediaDir, string isoPath, string volumeName = "DEBLOAT_WIN11", bool noPrompt = false)
   {
     mediaDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(mediaDir));   // o IMAPI2 não aceita "/" no caminho
     // O IMAPI2 não lida com caminhos de mais de 260 caracteres: se a pasta estiver funda, mapeia numa letra (como o subst).
@@ -29,7 +29,7 @@ public static class IsoWriter
     }
     try
     {
-      WriteCore(mediaDir, isoPath, volumeName);
+      WriteCore(mediaDir, isoPath, volumeName, noPrompt);
     }
     finally
     {
@@ -37,7 +37,7 @@ public static class IsoWriter
     }
   }
 
-  private static void WriteCore(string mediaDir, string isoPath, string volumeName)
+  private static void WriteCore(string mediaDir, string isoPath, string volumeName, bool noPrompt)
   {
     dynamic fs = Activator.CreateInstance(Type.GetTypeFromProgID("IMAPI2FS.MsftFileSystemImage", throwOnError: true)!)!;
     fs.ChooseImageDefaultsForMediaType(MediaTypeBdr);
@@ -50,7 +50,7 @@ public static class IsoWriter
     try
     {
       AddBoot(Path.Combine(mediaDir, "boot", "etfsboot.com"), PlatformX86, boots, streams);
-      AddBoot(Path.Combine(mediaDir, "efi", "microsoft", "boot", "efisys.bin"), PlatformEfi, boots, streams);
+      AddBoot(Path.Combine(mediaDir, "efi", "microsoft", "boot", noPrompt ? "efisys_noprompt.bin" : "efisys.bin"), PlatformEfi, boots, streams);
       if (boots.Count > 0) fs.BootImageOptionsArray = boots.ToArray();
 
       fs.Root.AddTree(mediaDir, false);

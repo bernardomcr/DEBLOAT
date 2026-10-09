@@ -8,7 +8,7 @@ internal static class PowerShell
 {
   public static async Task<string> RunAsync(string script, CancellationToken ct = default)
   {
-    string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\n" + script));
+    string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\n" + script + "\nexit 0"));   // sem o exit 0, um aviso ignorado no último comando vira "falhou"
     var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"),
       $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}")
     {
