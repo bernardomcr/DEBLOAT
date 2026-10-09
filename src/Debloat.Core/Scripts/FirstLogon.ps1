@@ -1,5 +1,5 @@
 # DEBLOAT — primeiro login: serviços, energia, DNS, apps e ponto de restauração.
-# @@APPS@@ e @@DNS@@ são trocados pelo programa ao gerar o autounattend.xml.
+# Os marcadores de apps e DNS (arroba-arroba) são trocados pelo programa ao gerar o autounattend.xml — não escreva o nome deles em comentários.
 
 $root = 'C:\Debloat'
 $logs = Join-Path $root 'logs'

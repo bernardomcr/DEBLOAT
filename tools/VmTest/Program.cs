@@ -53,6 +53,10 @@ try
         case "{SHIFT}": kb.InvokeMethod("TypeKey", [0x10]); break;     // acorda a tela
         case "{ENTER}": kb.InvokeMethod("TypeKey", [0x0D]); break;
         case "{ESC}": kb.InvokeMethod("TypeKey", [0x1B]); break;
+        case "{WAIT}": await Task.Delay(5000); break;
+        case "{CTRL+END}":
+          kb.InvokeMethod("PressKey", [0x11]); kb.InvokeMethod("TypeKey", [0x23]); kb.InvokeMethod("ReleaseKey", [0x11]);
+          break;
         default:
           // TypeText com a frase inteira perdia os espaços: digita um caractere por vez e o espaço como tecla.
           foreach (char c in part)
@@ -65,6 +69,9 @@ try
       }
       await Task.Delay(1500);
     }
+    await Task.Delay(6000);
+    var typeService = Query(typeScope, "SELECT * FROM Msvm_VirtualSystemManagementService").First();
+    Log("teclar: " + (Shot(typeScope, typeService, id, Path.Combine(shots, $"teclar-{DateTime.Now:HHmmss}.png")) ?? "print salvo"));
     return;
   }
   if (watchOnly)
@@ -142,6 +149,32 @@ catch (Exception e)
   Log("ERRO: " + e);
 }
 
+/// <summary>Salva um print da tela da VM (e copia para atual.png). Devolve o problema, ou null se deu certo.</summary>
+string? Shot(ManagementScope scope, ManagementObject service, string vmId, string file)
+{
+  try
+  {
+    var settings = Query(scope, $"SELECT * FROM Msvm_VirtualSystemSettingData WHERE VirtualSystemIdentifier='{vmId}' AND VirtualSystemType='Microsoft:Hyper-V:System:Realized'").First();
+    var input = service.GetMethodParameters("GetVirtualSystemThumbnailImage");
+    input["TargetSystem"] = settings.Path.Path;
+    input["WidthPixels"] = (ushort)1024;     // UInt16: com int o Hyper-V devolvia vazio
+    input["HeightPixels"] = (ushort)768;
+    var output = service.InvokeMethod("GetVirtualSystemThumbnailImage", input, null);
+    object? raw = output["ImageData"];
+    if (raw is not byte[] data || data.Length < 1024 * 768 * 2)
+    {
+      return $"print não veio: ReturnValue={output["ReturnValue"]}, tipo={raw?.GetType().Name ?? "null"}, tamanho={(raw as Array)?.Length}";
+    }
+    SaveRgb565(data, 1024, 768, file);
+    File.Copy(file, Path.Combine(shots, "atual.png"), overwrite: true);
+    return null;
+  }
+  catch (Exception e)
+  {
+    return "erro no print: " + e.Message;
+  }
+}
+
 async Task Watch(ManagementScope scope, string vmId)
 {
   var service = Query(scope, "SELECT * FROM Msvm_VirtualSystemManagementService").First();
@@ -150,32 +183,9 @@ async Task Watch(ManagementScope scope, string vmId)
   string? lastProblem = null;
   while (clock.Elapsed < TimeSpan.FromMinutes(minutes))
   {
-    try
-    {
-      var settings = Query(scope, $"SELECT * FROM Msvm_VirtualSystemSettingData WHERE VirtualSystemIdentifier='{vmId}' AND VirtualSystemType='Microsoft:Hyper-V:System:Realized'").First();
-      var input = service.GetMethodParameters("GetVirtualSystemThumbnailImage");
-      input["TargetSystem"] = settings.Path.Path;
-      input["WidthPixels"] = (ushort)1024;
-      input["HeightPixels"] = (ushort)768;
-      var output = service.InvokeMethod("GetVirtualSystemThumbnailImage", input, null);
-      object? raw = output["ImageData"];
-      if (raw is byte[] data && data.Length >= 1024 * 768 * 2)
-      {
-        string file = Path.Combine(shots, $"{n++:D4}-{DateTime.Now:HHmmss}.png");
-        SaveRgb565(data, 1024, 768, file);
-        File.Copy(file, Path.Combine(shots, "atual.png"), overwrite: true);
-      }
-      else
-      {
-        string problem = $"print não veio: ReturnValue={output["ReturnValue"]}, tipo={raw?.GetType().Name ?? "null"}, tamanho={(raw as Array)?.Length}";
-        if (problem != lastProblem) Log(lastProblem = problem);
-      }
-    }
-    catch (Exception e)
-    {
-      string problem = "erro no print: " + e.Message;
-      if (problem != lastProblem) Log(lastProblem = problem);
-    }
+    string? problem = Shot(scope, service, vmId, Path.Combine(shots, $"{n:D4}-{DateTime.Now:HHmmss}.png"));
+    if (problem is null) n++;
+    else if (problem != lastProblem) Log(lastProblem = problem);
     var state = Query(scope, $"SELECT EnabledState FROM Msvm_ComputerSystem WHERE Name='{vmId}'").First()["EnabledState"];
     if (Convert.ToInt32(state) == 3) { Log("VM desligou"); break; }     // 3 = desligada
     await Task.Delay(15000);
