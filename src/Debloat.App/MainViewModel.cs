@@ -8,6 +8,7 @@ using System.Security.Principal;
 using Debloat.Core.Catalog;
 using Debloat.Core.Media;
 using Debloat.Core.Presets;
+using Debloat.Core.Saves;
 using Microsoft.Win32;
 
 namespace Debloat.App;
@@ -39,6 +40,16 @@ public partial class CategoryItem(AppCategory category, IEnumerable<AppItem> app
 }
 
 public record DnsOption(DnsChoice Value, string Label);
+
+public partial class SaveItem(SaveGame game) : ObservableObject
+{
+  public SaveGame Game { get; } = game;
+
+  public string Detail => $"{Game.Source} · {Game.Files} arquivo(s) · {(Game.Bytes < 1_000_000 ? $"{Game.Bytes / 1e3:F0} KB" : $"{Game.Bytes / 1e6:F1} MB")}";
+
+  [ObservableProperty]
+  private bool isSelected = true;
+}
 
 public partial class MainViewModel : ObservableObject
 {
@@ -172,6 +183,38 @@ public partial class MainViewModel : ObservableObject
     });
   }
 
+  // --- Saves ---
+
+  public ObservableCollection<SaveItem> Saves { get; } = [];
+
+  public string SavesSummary => Saves.Count == 0
+    ? "Clique em procurar. Nada é copiado até você gravar o pendrive."
+    : $"{Saves.Count(s => s.IsSelected)} de {Saves.Count} jogos marcados · {Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes) / 1e6:F0} MB";
+
+  private SaveScanner Scanner => new(Http, Path.Combine(DataDir, "tools"));
+
+  [RelayCommand]
+  private async Task ScanSaves() => await RunBusy(async () =>
+  {
+    var games = await Scanner.ScanAsync(new Progress<string>(text => Status = text));
+    Saves.Clear();
+    foreach (var game in games)
+    {
+      var item = new SaveItem(game);
+      item.PropertyChanged += (_, _) => OnPropertyChanged(nameof(SavesSummary));
+      Saves.Add(item);
+    }
+    OnPropertyChanged(nameof(SavesSummary));
+    Status = $"{games.Count} jogos com saves encontrados.";
+  });
+
+  [RelayCommand]
+  private void ToggleAllSaves()
+  {
+    bool select = Saves.Any(s => !s.IsSelected);
+    foreach (var save in Saves) save.IsSelected = select;
+  }
+
   // --- Pendrive ---
 
   public ObservableCollection<UsbDrive> UsbDrives { get; } = [];
@@ -211,9 +254,15 @@ public partial class MainViewModel : ObservableObject
         new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 60; Status = step.Text + "..."; }));
       Status = "Levando os drivers de rede, disco e chipset deste PC...";
       var drivers = await DriverExporter.ExportAsync(MediaDir);
-      await UsbWriter.WriteAsync(drive, MediaDir,
-        new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 40; Status = step.Text + "..."; }));
-      Status = $"Pendrive pronto ({drivers.Count} drivers de hardware incluídos). Dê boot por ele no PC que vai ser formatado.";
+      var (_, data) = await UsbWriter.WriteAsync(drive, MediaDir,
+        new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 38; Status = step.Text + "..."; }));
+      var saves = Saves.Where(s => s.IsSelected).Select(s => s.Game).ToList();
+      if (saves.Count > 0 && data is char d)
+      {
+        Status = $"Salvando {saves.Count} saves de jogos no pendrive...";
+        await Scanner.BackupAsync(saves, $"{d}:\\");
+      }
+      Status = $"Pendrive pronto ({drivers.Count} drivers de hardware, {saves.Count} saves). Dê boot por ele no PC que vai ser formatado.";
     });
   }
 

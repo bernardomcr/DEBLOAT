@@ -131,3 +131,22 @@ public class InPlaceScriptTests
     Assert.DoesNotContain("clean", Script, StringComparison.OrdinalIgnoreCase);
   }
 }
+
+public class SaveTests
+{
+  [Fact]
+  public void Caminhos_viram_variaveis_para_trocar_de_usuario()
+  {
+    string appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    Assert.Equal(@"%APPDATA%\GSE Saves\1971870", Debloat.Core.Saves.SaveScanner.TokenizePath(Path.Combine(appdata, "GSE Saves", "1971870")));
+  }
+
+  [Fact]
+  public void Raizes_de_emuladores_confirmadas_em_dados_reais()
+  {
+    var verified = Debloat.Core.Saves.SaveScanner.Roots().Where(r => r.Verified).Select(r => r.Label).ToList();
+    Assert.Contains("OnlineFix", verified);
+    Assert.Contains("Goldberg (gbe_fork)", verified);
+    Assert.Contains("CODEX / PLAZA", verified);
+  }
+}

@@ -150,12 +150,33 @@
       <!-- BACKUP -->
       <TabItem Header="Backup">
         <ScrollViewer Padding="16">
-          <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+          <StackPanel MaxWidth="820" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Levar para o Windows novo" />
-            <TextBlock Style="{StaticResource Hint}" Text="Chega na próxima etapa. Tudo é salvo no pendrive ou em outro disco e volta para o lugar de origem depois da instalação." />
-            <ui:CardControl Header="Saves de jogos" Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}" IsEnabled="False">
-              <TextBlock Text="Varredura com o manifesto do Ludusavi + pastas de emuladores (CODEX, RUNE, Goldberg, OnlineFix…). Você escolhe os jogos." TextWrapping="Wrap" MaxWidth="360" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-            </ui:CardControl>
+            <TextBlock Style="{StaticResource Hint}" Text="Vai para a partição DEBLOAT-DADOS do pendrive quando você gravar, e volta sozinho para o lugar de origem no primeiro login do Windows novo. Wi-Fi, navegadores, ShareX e pastas chegam na próxima etapa." />
+            <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}" IsExpanded="True">
+              <ui:CardExpander.Header>
+                <DockPanel>
+                  <ui:Button DockPanel.Dock="Right" Content="Marcar/desmarcar todos" Appearance="Transparent" Command="{Binding ToggleAllSavesCommand}" Margin="0,0,12,0" />
+                  <ui:Button DockPanel.Dock="Right" Content="Procurar saves" Appearance="Primary" Command="{Binding ScanSavesCommand}" Margin="0,0,8,0" />
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Saves de jogos" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SavesSummary}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </DockPanel>
+              </ui:CardExpander.Header>
+              <ItemsControl ItemsSource="{Binding Saves}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Game.Name}" />
+                        <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ui:CardExpander>
             <ui:CardControl Header="Redes Wi-Fi" Margin="0,0,0,4" Icon="{ui:SymbolIcon Wifi124}" IsEnabled="False" />
             <ui:CardControl Header="Navegadores" Margin="0,0,0,4" Icon="{ui:SymbolIcon Globe24}" IsEnabled="False">
               <TextBlock Text="Firefox volta logado. Chrome/Edge/Brave: extensões e favoritos; login e senhas pela sincronização da conta." TextWrapping="Wrap" MaxWidth="360" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

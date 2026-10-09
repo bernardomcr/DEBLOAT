@@ -57,6 +57,24 @@ if( $dnsTable.ContainsKey( $dnsChoice ) ) {
 	Write-Log 'dns.log' "DNS aplicado: $dnsChoice"
 }
 
+# --- Saves de jogos (backup do DEBLOAT na partição DEBLOAT-DADOS do pendrive) ---
+$dados = Get-Volume -FileSystemLabel 'DEBLOAT-DADOS' -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -First 1
+if( $dados ) {
+	$saves = "$($dados.DriveLetter):\saves"
+	$ludusavi = "$($dados.DriveLetter):\ferramentas\ludusavi.exe"
+	if( (Test-Path -LiteralPath "$saves\ludusavi") -and (Test-Path -LiteralPath $ludusavi) ) {
+		& $ludusavi --config "$root\ludusavi" restore --path "$saves\ludusavi" --force --api 2>&1 | Out-File -LiteralPath (Join-Path $logs 'saves-ludusavi.log') -Encoding UTF8
+	}
+	if( Test-Path -LiteralPath "$saves\emuladores.json" ) {
+		foreach( $game in (Get-Content -LiteralPath "$saves\emuladores.json" -Raw | ConvertFrom-Json) ) {
+			$target = [Environment]::ExpandEnvironmentVariables( $game.original )
+			New-Item -ItemType Directory -Force -Path $target | Out-Null
+			Copy-Item -Path "$saves\$($game.stored)\*" -Destination $target -Recurse -Force
+			Write-Log 'saves.log' "Restaurado: $($game.name) ($($game.source)) -> $target"
+		}
+	}
+}
+
 # --- Apps ---
 $apps = @'
 @@APPS@@
