@@ -73,6 +73,21 @@ if( $dados ) {
 			Write-Log 'saves.log' "Restaurado: $($game.name) ($($game.source)) -> $target"
 		}
 	}
+	# Migração: Wi-Fi, ShareX, navegadores e pastas (antes dos apps: o Wi-Fi traz a internet e os navegadores
+	# precisam achar o perfil antes de abrir pela primeira vez).
+	$mig = "$($dados.DriveLetter):\migracao"
+	if( Test-Path -LiteralPath "$mig\manifest.json" ) {
+		foreach( $item in (Get-Content -LiteralPath "$mig\manifest.json" -Raw | ConvertFrom-Json) ) {
+			$source = Join-Path $mig $item.stored
+			if( $item.kind -eq 'Wifi' ) {
+				Get-ChildItem -LiteralPath $source -Filter '*.xml' | ForEach-Object { netsh.exe wlan add profile filename="$($_.FullName)" user=all | Out-Null }
+			} else {
+				$target = [Environment]::ExpandEnvironmentVariables( $item.original )
+				robocopy.exe $source $target /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+			}
+			Write-Log 'migracao.log' "Restaurado: $($item.name)"
+		}
+	}
 }
 
 # --- Apps ---

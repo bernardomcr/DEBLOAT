@@ -11,7 +11,11 @@ public partial class MainWindow : FluentWindow
   {
     DataContext = vm;
     InitializeComponent();
-    Loaded += async (_, _) => await vm.RefreshUsbCommand.ExecuteAsync(null);
+    Loaded += async (_, _) =>
+    {
+      await vm.RefreshUsbCommand.ExecuteAsync(null);
+      await vm.LoadMigrationAsync();
+    };
   }
 
   private async void WriteUsb_Click(object sender, RoutedEventArgs e)

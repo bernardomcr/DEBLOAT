@@ -152,7 +152,7 @@
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="820" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Levar para o Windows novo" />
-            <TextBlock Style="{StaticResource Hint}" Text="Vai para a partição DEBLOAT-DADOS do pendrive quando você gravar, e volta sozinho para o lugar de origem no primeiro login do Windows novo. Wi-Fi, navegadores, ShareX e pastas chegam na próxima etapa." />
+            <TextBlock Style="{StaticResource Hint}" Text="Vai para a partição DEBLOAT-DADOS do pendrive quando você gravar, e volta sozinho para o lugar de origem no primeiro login do Windows novo. Tudo marcado aqui vai junto." />
             <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}" IsExpanded="True">
               <ui:CardExpander.Header>
                 <DockPanel>
@@ -177,12 +177,26 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </ui:CardExpander>
-            <ui:CardControl Header="Redes Wi-Fi" Margin="0,0,0,4" Icon="{ui:SymbolIcon Wifi124}" IsEnabled="False" />
-            <ui:CardControl Header="Navegadores" Margin="0,0,0,4" Icon="{ui:SymbolIcon Globe24}" IsEnabled="False">
-              <TextBlock Text="Firefox volta logado. Chrome/Edge/Brave: extensões e favoritos; login e senhas pela sincronização da conta." TextWrapping="Wrap" MaxWidth="360" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-            </ui:CardControl>
-            <ui:CardControl Header="Configuração do ShareX" Margin="0,0,0,4" Icon="{ui:SymbolIcon Screenshot24}" IsEnabled="False" />
-            <ui:CardControl Header="Pastas (Área de Trabalho, Documentos, Downloads…)" Margin="0,0,0,4" Icon="{ui:SymbolIcon Folder24}" IsEnabled="False" />
+            <ui:CardExpander Margin="0,8,0,4" Icon="{ui:SymbolIcon ArrowSync24}" IsExpanded="True">
+              <ui:CardExpander.Header>
+                <StackPanel>
+                  <TextBlock Text="Wi-Fi, ShareX, navegadores e pastas" FontWeight="SemiBold" />
+                  <TextBlock Text="Feche os navegadores antes de gravar. Chrome/Edge/Brave: login e senhas voltam pela sincronização da conta." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+              </ui:CardExpander.Header>
+              <ItemsControl ItemsSource="{Binding Migration}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Item.Name}" />
+                        <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ui:CardExpander>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

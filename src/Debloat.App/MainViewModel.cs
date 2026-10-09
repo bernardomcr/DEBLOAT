@@ -41,6 +41,16 @@ public partial class CategoryItem(AppCategory category, IEnumerable<AppItem> app
 
 public record DnsOption(DnsChoice Value, string Label);
 
+public partial class MigrationRow(MigrationItem item) : ObservableObject
+{
+  public MigrationItem Item { get; } = item;
+
+  public string Detail => Item.Kind == MigrationKind.Wifi ? Item.Note : $"{MainViewModel.Size(Item.Bytes)} · {Item.Note}";
+
+  [ObservableProperty]
+  private bool isSelected = item.DefaultSelected;
+}
+
 public partial class SaveItem(SaveGame game) : ObservableObject
 {
   public SaveGame Game { get; } = game;
@@ -237,6 +247,28 @@ public partial class MainViewModel : ObservableObject
     foreach (var save in Saves) save.IsSelected = select;
   }
 
+  // --- Migração (Wi-Fi, ShareX, navegadores, pastas) ---
+
+  public ObservableCollection<MigrationRow> Migration { get; } = [];
+
+  public static string Size(long bytes) => bytes switch
+  {
+    < 1_000_000 => $"{bytes / 1e3:F0} KB",
+    < 1_000_000_000 => $"{bytes / 1e6:F0} MB",
+    _ => $"{bytes / 1e9:F1} GB",
+  };
+
+  public async Task LoadMigrationAsync()
+  {
+    var items = await Task.Run(Debloat.Core.Saves.Migration.Detect);
+    Migration.Clear();
+    foreach (var item in items) Migration.Add(new MigrationRow(item));
+  }
+
+  /// <summary>Quanto vai para a partição de dados (saves + migração).</summary>
+  private long BackupBytes =>
+    Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes) + Migration.Where(m => m.IsSelected).Sum(m => m.Item.Bytes);
+
   // --- Pendrive ---
 
   public ObservableCollection<UsbDrive> UsbDrives { get; } = [];
@@ -268,6 +300,19 @@ public partial class MainViewModel : ObservableObject
       Status = "Para gravar o pendrive, abra o DEBLOAT como administrador.";
       return;
     }
+    var migration = Migration.Where(m => m.IsSelected).Select(m => m.Item).ToList();
+    var open = Debloat.Core.Saves.Migration.OpenPrograms(migration);
+    if (open.Count > 0)
+    {
+      Status = $"Feche antes de gravar (eles travam os arquivos): {string.Join(", ", open)}.";
+      return;
+    }
+    long dataSpace = drive.Size - UsbWriter.BootPartitionSize(drive.Size);
+    if (BackupBytes > 0 && BackupBytes > dataSpace - (512L << 20))
+    {
+      Status = $"O backup marcado ({Size(BackupBytes)}) não cabe na parte de dados deste pendrive ({Size(dataSpace)}). Desmarque algumas pastas.";
+      return;
+    }
     await RunBusy(async () =>
     {
       if (esdPath is null) await EnsureWindowsAsync();
@@ -283,6 +328,10 @@ public partial class MainViewModel : ObservableObject
       {
         Status = $"Salvando {saves.Count} saves de jogos no pendrive...";
         await Scanner.BackupAsync(saves, $"{d}:\\");
+      }
+      if (migration.Count > 0 && data is char m)
+      {
+        await Debloat.Core.Saves.Migration.BackupAsync(migration, $"{m}:\\", new Progress<string>(text => Status = text));
       }
       Status = $"Pendrive pronto ({drivers.Count} drivers de hardware, {saves.Count} saves). Dê boot por ele no PC que vai ser formatado.";
     });
