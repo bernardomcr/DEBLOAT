@@ -15,7 +15,9 @@ string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.L
 string shots = Path.Combine(root, "telas");
 string log = Path.Combine(root, "log.txt");
 int minutes = args.Select(a => int.TryParse(a, out int m) ? m : 0).FirstOrDefault(m => m > 0, 90);
-bool reuse = args.Contains("--reusar");     // reaproveita a mídia já montada e só troca o autounattend.xml
+bool reuse = args.Contains("--reusar");
+bool watchOnly = args.Contains("--acompanhar");  // só acompanha a VM que já está rodando (não recria nada)
+if (watchOnly) log = Path.Combine(root, "log-acompanhar.txt");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
 File.WriteAllText(log, "");
 var logLock = new object();
@@ -30,6 +32,14 @@ void Log(string text)
 
 try
 {
+  if (watchOnly)
+  {
+    var watchScope = new ManagementScope(@"\\.\root\virtualization\v2");
+    watchScope.Connect();
+    string id = (string)Query(watchScope, $"SELECT * FROM Msvm_ComputerSystem WHERE ElementName='{VmName}'").First()["Name"];
+    await Watch(watchScope, id);
+    return;
+  }
   string esd = Directory.GetFiles(Path.Combine(root, "..", "cache"), "*.esd").Single();
   string media = Path.Combine(root, "midia");
   // ISO e disco ficam numa pasta do sistema: no 1º teste o Hyper-V disse "anexo não encontrado" com a ISO no AppData.
@@ -90,32 +100,52 @@ try
   }
   Log("VM ligada; acompanhando a tela");
 
+  await Watch(scope, vmId);
+}
+catch (Exception e)
+{
+  Log("ERRO: " + e);
+}
+
+async Task Watch(ManagementScope scope, string vmId)
+{
   var service = Query(scope, "SELECT * FROM Msvm_VirtualSystemManagementService").First();
   var clock = Stopwatch.StartNew();
   int n = 0;
+  string? lastProblem = null;
   while (clock.Elapsed < TimeSpan.FromMinutes(minutes))
   {
-    var settings = Query(scope, $"SELECT * FROM Msvm_VirtualSystemSettingData WHERE VirtualSystemIdentifier='{vmId}' AND VirtualSystemType='Microsoft:Hyper-V:System:Realized'").First();
-    var input = service.GetMethodParameters("GetVirtualSystemThumbnailImage");
-    input["TargetSystem"] = settings.Path.Path;
-    input["WidthPixels"] = 1024;
-    input["HeightPixels"] = 768;
-    var output = service.InvokeMethod("GetVirtualSystemThumbnailImage", input, null);
-    if (output["ImageData"] is byte[] data && data.Length == 1024 * 768 * 2)
+    try
     {
-      string file = Path.Combine(shots, $"{n++:D4}-{DateTime.Now:HHmmss}.png");
-      SaveRgb565(data, 1024, 768, file);
-      File.Copy(file, Path.Combine(shots, "atual.png"), overwrite: true);
+      var settings = Query(scope, $"SELECT * FROM Msvm_VirtualSystemSettingData WHERE VirtualSystemIdentifier='{vmId}' AND VirtualSystemType='Microsoft:Hyper-V:System:Realized'").First();
+      var input = service.GetMethodParameters("GetVirtualSystemThumbnailImage");
+      input["TargetSystem"] = settings.Path.Path;
+      input["WidthPixels"] = (ushort)1024;
+      input["HeightPixels"] = (ushort)768;
+      var output = service.InvokeMethod("GetVirtualSystemThumbnailImage", input, null);
+      object? raw = output["ImageData"];
+      if (raw is byte[] data && data.Length >= 1024 * 768 * 2)
+      {
+        string file = Path.Combine(shots, $"{n++:D4}-{DateTime.Now:HHmmss}.png");
+        SaveRgb565(data, 1024, 768, file);
+        File.Copy(file, Path.Combine(shots, "atual.png"), overwrite: true);
+      }
+      else
+      {
+        string problem = $"print não veio: ReturnValue={output["ReturnValue"]}, tipo={raw?.GetType().Name ?? "null"}, tamanho={(raw as Array)?.Length}";
+        if (problem != lastProblem) Log(lastProblem = problem);
+      }
+    }
+    catch (Exception e)
+    {
+      string problem = "erro no print: " + e.Message;
+      if (problem != lastProblem) Log(lastProblem = problem);
     }
     var state = Query(scope, $"SELECT EnabledState FROM Msvm_ComputerSystem WHERE Name='{vmId}'").First()["EnabledState"];
     if (Convert.ToInt32(state) == 3) { Log("VM desligou"); break; }     // 3 = desligada
     await Task.Delay(15000);
   }
   Log($"Fim do acompanhamento ({clock.Elapsed.TotalMinutes:F0} min). A VM continua no Hyper-V para inspeção.");
-}
-catch (Exception e)
-{
-  Log("ERRO: " + e);
 }
 
 static IEnumerable<ManagementObject> Query(ManagementScope scope, string wql) =>
