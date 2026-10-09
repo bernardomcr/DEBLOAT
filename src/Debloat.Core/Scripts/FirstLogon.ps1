@@ -6,6 +6,7 @@ $logs = Join-Path $root 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $hasBattery = [bool](Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue)
 $started = Get-Date
+$ProgressPreference = 'SilentlyContinue'   # a barra de progresso deixa o PowerShell 5.1 muito lento
 
 function Write-Log([string] $File, [string] $Text) {
 	# Tenta de novo se o arquivo estiver aberto (na VM, o log aberto no Bloco de Notas fez uma linha sumir).
@@ -142,6 +143,12 @@ function Invoke-Winget([string[]] $Arguments) {
 	return $code
 }
 
+function Get-File([string] $Url, [string] $Path) {
+	# curl.exe (vem no Windows 11): o Invoke-WebRequest do PowerShell 5.1 levava mais de 15 min para 244 MB na VM.
+	& "$env:SystemRoot\System32\curl.exe" --location --fail --silent --show-error --retry 3 --max-time 1800 --output $Path $Url
+	if( $LASTEXITCODE -ne 0 ) { throw "download falhou (curl $LASTEXITCODE): $Url" }
+}
+
 function Install-Downloaded([string] $File, [string] $Arguments) {
 	if( $File -like '*.msi' ) {
 		$p = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -Wait -PassThru
@@ -157,7 +164,7 @@ function Install-FromVendor($App) {
 	# Plano B quando o manifesto do winget está desatualizado: baixa do link oficial do fabricante e só
 	# instala se a assinatura digital for válida E do fabricante esperado (sem hash do winget, é isso que protege).
 	$file = Join-Path $env:TEMP ("debloat-" + $App.id + ".exe")
-	Invoke-WebRequest -Uri $App.fallbackUrl -OutFile $file -UseBasicParsing
+	Get-File $App.fallbackUrl $file
 	$sig = Get-AuthenticodeSignature -LiteralPath $file
 	if( $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike "*$($App.signer)*" ) {
 		Write-Log 'apps.log' "  plano B recusado: assinatura $($sig.Status) de '$($sig.SignerCertificate.Subject)'"
@@ -218,14 +225,14 @@ if( $apps.Count -gt 0 ) {
 				}
 				'url' {
 					$file = Join-Path $env:TEMP ([uri] $app.package).Segments[-1]
-					Invoke-WebRequest -Uri $app.package -OutFile $file -UseBasicParsing
+					Get-File $app.package $file
 					Install-Downloaded $file $app.args | Out-Null
 				}
 				'github' {
 					$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($app.package)/releases/latest" -Headers @{ 'User-Agent' = 'DEBLOAT' }
 					$asset = $release.assets | Where-Object { $_.name -match $app.asset } | Select-Object -First 1
 					$file = Join-Path $env:TEMP $asset.name
-					Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $file -UseBasicParsing
+					Get-File $asset.browser_download_url $file
 					Install-Downloaded $file $app.args | Out-Null
 				}
 			}

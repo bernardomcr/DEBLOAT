@@ -19,7 +19,7 @@ bool reuse = args.Contains("--reusar");
 bool watchOnly = args.Contains("--acompanhar");  // só acompanha a VM que já está rodando (não recria nada)
 if (watchOnly) log = Path.Combine(root, "log-acompanhar.txt");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
-if (!args.Contains("--teclar") && !args.Contains("--coletar") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
+if (!args.Contains("--teclar") && !args.Contains("--coletar") && !args.Contains("--rodar-apps") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
 var logLock = new object();
 void Log(string text)
 {
@@ -58,6 +58,57 @@ try
       Start-VM -Name '{{VmName}}'
       """);
     Log($"Logs da VM copiados para {dest}");
+    return;
+  }
+  int runAt = Array.IndexOf(args, "--rodar-apps");
+  if (runAt >= 0)
+  {
+    // Roda o primeiro login só com alguns apps DENTRO da VM já instalada (PowerShell Direct), sem recriar nada.
+    var catalog = Debloat.Core.Catalog.AppCatalog.Load();
+    var apps = catalog.Resolve(args[runAt + 1].Split(','));
+    string script = Debloat.Core.Resources.Script("FirstLogon.ps1")
+      .Replace("@@DNS@@", "provider")
+      .Replace("@@APPS@@", Debloat.Core.Catalog.AppCatalog.ToScriptJson(apps));
+    string local = Path.Combine(root, "rodar.ps1");
+    File.WriteAllText(local, script, new System.Text.UTF8Encoding(true));
+    string output = Path.Combine(root, $"rodar-{DateTime.Now:HHmmss}.log");
+    Log($"Rodando na VM: {string.Join(", ", apps.Select(a => a.Name))}");
+    await Ps($$"""
+      $cred = New-Object System.Management.Automation.PSCredential('Usuario', (New-Object System.Security.SecureString))
+      $s = $null
+      try { $s = New-PSSession -VMName '{{VmName}}' -Credential $cred -ErrorAction Stop } catch { }
+      if( -not $s ) {
+      # Só na VM de teste: libera conta sem senha no PowerShell Direct (o Windows bloqueia por padrão).
+      # Edita o registro da VM com ela desligada, pelo disco virtual.
+      $vhd = Join-Path $env:ProgramData 'DEBLOAT-VM\disco.vhdx'
+      Stop-VM -Name '{{VmName}}' -Force
+      $disk = Mount-VHD -Path $vhd -Passthru | Get-Disk
+      try {
+        $win = Get-Partition -DiskNumber $disk.Number | Where-Object { $_.Type -eq 'Basic' -and $_.Size -gt 20GB } | Select-Object -First 1
+        if( -not $win.DriveLetter ) { $win | Add-PartitionAccessPath -AssignDriveLetter; $win = Get-Partition -DiskNumber $disk.Number -PartitionNumber $win.PartitionNumber }
+        reg.exe load HKLM\DEBLOATVM "$($win.DriveLetter):\Windows\System32\config\SYSTEM" | Out-Null
+        reg.exe add HKLM\DEBLOATVM\ControlSet001\Control\Lsa /v LimitBlankPasswordUse /t REG_DWORD /d 0 /f | Out-Null
+        [gc]::Collect()
+        reg.exe unload HKLM\DEBLOATVM | Out-Null
+      } finally {
+        Dismount-VHD -Path $vhd
+      }
+      Start-VM -Name '{{VmName}}'
+      $s = $null
+      foreach( $try in 1..40 ) {
+        try { $s = New-PSSession -VMName '{{VmName}}' -Credential $cred -ErrorAction Stop; break } catch { Start-Sleep -Seconds 10 }
+      }
+      if( -not $s ) { throw 'A VM não aceitou o PowerShell Direct depois de 6 minutos.' }
+      }
+      try {
+        Invoke-Command -Session $s -ScriptBlock { Remove-Item 'C:\Debloat\logs\apps.log' -ErrorAction SilentlyContinue }
+        Invoke-Command -Session $s -FilePath '{{local}}' *>&1 | Out-File '{{output}}' -Encoding UTF8
+        Invoke-Command -Session $s -ScriptBlock { Get-Content 'C:\Debloat\logs\apps.log' } | Out-File '{{output}}' -Append -Encoding UTF8
+      } finally {
+        Remove-PSSession $s
+      }
+      """);
+    Log($"Resultado em {output}");
     return;
   }
   int typeAt = Array.IndexOf(args, "--teclar");
