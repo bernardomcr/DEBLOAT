@@ -131,7 +131,7 @@ function Invoke-Winget([string[]] $Arguments) {
 	# Guarda as últimas linhas da saída no log: "saiu com 0" sozinho já escondeu um bug.
 	$output = & $winget @Arguments 2>&1 | Out-String
 	$code = $LASTEXITCODE
-	$tail = ($output -split "`r?`n" | Where-Object { $_.Trim() -and $_ -notmatch '^[\s\-\|/█▒]+$' } | Select-Object -Last 2) -join ' | '
+	$tail = ($output -split "`r?`n" | Where-Object { $_ -match '[A-Za-z]{3,}' } | Select-Object -Last 1)   # só texto (as barras de progresso viravam lixo)
 	Write-Log 'apps.log' "  winget saiu com $code — $tail"
 }
 
@@ -169,7 +169,8 @@ if( $apps.Count -gt 0 ) {
 				}
 				'winget' {
 					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
-					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture ) }
+					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
+					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture, '--force' ) }
 					Invoke-Winget $wingetArgs
 				}
 				'msstore' {
