@@ -91,6 +91,7 @@ public sealed class UnattendBuilder
       DisableBingResults = true,
       TaskbarSearch = everythingToolbar ? TaskbarSearchMode.Hide : TaskbarSearchMode.Box,
       StartPinsSettings = new EmptyStartPinsSettings(),
+      TaskbarIcons = new CustomTaskbarIcons(TaskbarExplorerOnly),     // sem Edge e Loja fixados (visto na VM)
       DesktopIcons = new CustomDesktopIconSettings(new Dictionary<DesktopIcon, bool>
       {
         [generator.Lookup<DesktopIcon>("ThisPC")] = true,
@@ -126,6 +127,18 @@ public sealed class UnattendBuilder
     scripts.Add(new(firstLogon, ScriptPhase.FirstLogon, ScriptType.Ps1));
     return scripts;
   }
+
+  private const string TaskbarExplorerOnly = """
+    <LayoutModificationTemplate xmlns="http://schemas.microsoft.com/Start/2014/LayoutModification" xmlns:defaultlayout="http://schemas.microsoft.com/Start/2014/FullDefaultLayout" xmlns:start="http://schemas.microsoft.com/Start/2014/StartLayout" xmlns:taskbar="http://schemas.microsoft.com/Start/2014/TaskbarLayout" Version="1">
+      <CustomTaskbarLayoutCollection PinListPlacement="Replace">
+        <defaultlayout:TaskbarLayout>
+          <taskbar:TaskbarPinList>
+            <taskbar:DesktopApp DesktopApplicationID="Microsoft.Windows.Explorer" />
+          </taskbar:TaskbarPinList>
+        </defaultlayout:TaskbarLayout>
+      </CustomTaskbarLayoutCollection>
+    </LayoutModificationTemplate>
+    """;
 
   /// <summary>Chaves genéricas de instalação (não ativam; servem para escolher a edição).</summary>
   private static readonly Dictionary<string, string> GenericKeys = new() { ["pro"] = "VK7JG-NPHTM-C97JM-9MPGT-3V66T" };

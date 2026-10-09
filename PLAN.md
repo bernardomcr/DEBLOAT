@@ -148,6 +148,22 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
    ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
+## Teste em VM (09/10/2026) — `tools/VmTest`
+
+Hyper-V, Geração 2, Secure Boot + TPM, disco de 80 GB, pendrive simulado por ISO (modo `WipeDisk0`).
+- ✅ WinPE do gerador particionou e aplicou o `install.swm` em ~1 min; reiniciou sozinho.
+- ✅ Specialize + OOBE **sem nenhuma pergunta**, login automático na conta "Usuario" (sem senha).
+- ✅ Na área de trabalho: barra à esquerda, sem Widgets/Visão de Tarefas/busca (Everything Toolbar),
+  Iniciar sem fixados, modo escuro, Lixeira e Este Computador, pt-BR + ABNT2 + horário de Brasília.
+- ❌ "Recomendações → Introdução" no Iniciar (HideRecommendedSection não vale no Pro) → testar
+  `Start_TrackProgs=0` (já no preset).
+- ❌ Edge e Loja fixados na barra → layout só com o Explorador (já no preset).
+- ❓ Ícone de rede desconectado na VM: falta descobrir se é a rede da VM (Default Switch) ou algo do
+  preset. Sem rede os apps não instalam. Próximo passo: `VmTest --teclar {WIN+R} C:\Debloat\logspps.log {ENTER}`
+  e `ncpa.cpl` (o envio de espaço pelo teclado da VM não funciona: evitar comandos com espaço).
+- Lições do testador: largura/altura do print em UInt16; o gerador exige disco ≥ 100 GB (VM usa 30);
+  Progress<T> escreve de outra thread (trava no log); "exit 0" no fim dos scripts de PowerShell.
+
 ## A conferir em máquina virtual
 
 Valores marcados "conferir em VM" nos scripts (DisableSettingsAgent, HideRecommendedSection no Pro,

@@ -19,7 +19,7 @@ bool reuse = args.Contains("--reusar");
 bool watchOnly = args.Contains("--acompanhar");  // só acompanha a VM que já está rodando (não recria nada)
 if (watchOnly) log = Path.Combine(root, "log-acompanhar.txt");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
-File.WriteAllText(log, "");
+if (!args.Contains("--teclar") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
 var logLock = new object();
 void Log(string text)
 {
@@ -35,7 +35,7 @@ try
   int typeAt = Array.IndexOf(args, "--teclar");
   if (typeAt >= 0)
   {
-    // Digita na VM: cada argumento depois de --teclar é um texto, ou {SHIFT+F10} / {ENTER} / {ESC}.
+    // Digita na VM: cada argumento depois de --teclar é um texto, ou {SHIFT+F10} / {WIN+R} / {SHIFT} / {ENTER} / {ESC}.
     var typeScope = new ManagementScope(@"\\.\root\virtualization\v2");
     typeScope.Connect();
     string id = (string)Query(typeScope, $"SELECT * FROM Msvm_ComputerSystem WHERE ElementName='{VmName}'").First()["Name"];
@@ -47,9 +47,21 @@ try
         case "{SHIFT+F10}":
           kb.InvokeMethod("PressKey", [0x10]); kb.InvokeMethod("TypeKey", [0x79]); kb.InvokeMethod("ReleaseKey", [0x10]);
           break;
+        case "{WIN+R}":
+          kb.InvokeMethod("PressKey", [0x5B]); kb.InvokeMethod("TypeKey", [0x52]); kb.InvokeMethod("ReleaseKey", [0x5B]);
+          break;
+        case "{SHIFT}": kb.InvokeMethod("TypeKey", [0x10]); break;     // acorda a tela
         case "{ENTER}": kb.InvokeMethod("TypeKey", [0x0D]); break;
         case "{ESC}": kb.InvokeMethod("TypeKey", [0x1B]); break;
-        default: kb.InvokeMethod("TypeText", [part]); break;
+        default:
+          // TypeText com a frase inteira perdia os espaços: digita um caractere por vez e o espaço como tecla.
+          foreach (char c in part)
+          {
+            if (c == ' ') kb.InvokeMethod("TypeScancodes", [new byte[] { 0x39, 0xB9 }]);   // TypeKey(VK_SPACE) também sumia
+            else kb.InvokeMethod("TypeText", [c.ToString()]);
+            await Task.Delay(40);
+          }
+          break;
       }
       await Task.Delay(1500);
     }
