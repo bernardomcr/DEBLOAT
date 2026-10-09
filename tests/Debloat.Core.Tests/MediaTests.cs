@@ -90,3 +90,21 @@ public class MediaTests
     Assert.False(File.Exists(path));
   }
 }
+
+public class UsbLayoutTests
+{
+  [Theory]
+  [InlineData(16L << 30, 16L << 30)]     // pendrive pequeno: tudo FAT32
+  [InlineData(62L << 30, 31L << 30)]     // 64 GB: 31 GiB FAT32 + resto NTFS
+  public void Particao_de_boot_respeita_o_limite_do_FAT32(long disk, long expected)
+  {
+    Assert.Equal(expected, Debloat.Core.Media.UsbWriter.BootPartitionSize(disk));
+  }
+
+  [Fact]
+  public void Drivers_de_video_nunca_vao_para_o_pendrive()
+  {
+    Assert.DoesNotContain("Display", Debloat.Core.Media.DriverExporter.Classes);
+    Assert.DoesNotContain("ROOT\\", Debloat.Core.Media.DriverExporter.PhysicalBuses);
+  }
+}

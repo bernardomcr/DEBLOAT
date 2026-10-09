@@ -71,7 +71,8 @@ Win32PrioritySeparation; mexer no WinSxS; embutir ativadores de qualquer coisa.
 
 Instalação limpa não leva driver antigo nenhum. O risco real é ficar **sem internet/disco** depois:
 1. Antes de formatar, exportar do PC atual **só** drivers de rede, armazenamento e chipset para
-   `$WinPEDriver$` no pendrive (o Setup carrega sozinho).
+   `$WinPEDriver$` no pendrive (o Setup carrega sozinho) — e só de hardware físico presente; drivers de
+   dispositivos virtuais de programas (VPN, Parsec, emulador de controle) não vão.
 2. Driver de vídeo antigo **não vai junto** (é a "limpeza profunda").
 3. Impedir o Windows Update de empurrar driver de vídeo genérico logo após instalar; depois
    instalar o driver oficial (NVIDIA/AMD/Intel pelo ID do hardware) e ajustar a taxa de
@@ -125,7 +126,12 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 1. **Núcleo** — [x] preset → autounattend.xml (gerador schneegans) · [x] catálogo de apps + DNS
    no primeiro login · [x] janela com abas e exportar XML · [x] download do Windows pelos catálogos
    da MCT (CDN da Microsoft + SHA-256, várias conexões; 25H2 5 GB em ~60 s) · [x] montar a pasta de
-   instalação com DISM (testado: 232 s, boot.wim 0,56 GB + install.swm 3,7 + 2,2 GB) · [ ] gravar pendrive
+   instalação com DISM (testado: 232 s, boot.wim 0,56 GB + install.swm 3,7 + 2,2 GB) · [x] gravar pendrive (só disco USB, nunca
+   boot/sistema, conferido de novo antes de apagar; MBR + FAT32 ativa de até 31 GiB para boot UEFI/BIOS
+   + NTFS "DEBLOAT-DADOS" com o resto para os backups; bootsect) · [x] `$WinPEDriver$` só com drivers
+   oem de hardware físico presente (PCI/USB/ACPI; da classe USB só controladoras PCI) — o 1º teste levou
+   16 drivers virtuais (Parsec, WireGuard, TAP, ViGEm, Xbox) e o filtro foi corrigido · [ ] cache offline dos
+   instaladores no pendrive · [ ] testar instalação real em VM
    (GPT/UEFI, split do install.wim >4 GB, `$WinPEDriver$` com drivers de rede/disco, instaladores
    dos apps em cache offline no pendrive).
 2. **Migração e acabamento** — backup (saves, Wi-Fi, navegadores, ShareX, pastas), debloat

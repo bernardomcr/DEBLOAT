@@ -172,6 +172,51 @@ public partial class MainViewModel : ObservableObject
     });
   }
 
+  // --- Pendrive ---
+
+  public ObservableCollection<UsbDrive> UsbDrives { get; } = [];
+
+  [ObservableProperty] private UsbDrive? selectedUsb;
+
+  [RelayCommand]
+  private async Task RefreshUsb()
+  {
+    try
+    {
+      var drives = await UsbWriter.ListAsync();
+      UsbDrives.Clear();
+      foreach (var d in drives) UsbDrives.Add(d);
+      SelectedUsb = UsbDrives.FirstOrDefault();
+      if (UsbDrives.Count == 0) Status = "Nenhum pendrive USB encontrado. Conecte um e clique em atualizar.";
+    }
+    catch (Exception e)
+    {
+      Status = $"Não deu para listar os pendrives: {e.Message}";
+    }
+  }
+
+  /// <summary>Faz tudo: baixa, monta, leva os drivers e grava. A janela pergunta antes de chamar.</summary>
+  public async Task WriteUsbAsync(UsbDrive drive)
+  {
+    if (!IsAdmin)
+    {
+      Status = "Para gravar o pendrive, abra o DEBLOAT como administrador.";
+      return;
+    }
+    await RunBusy(async () =>
+    {
+      if (esdPath is null) await EnsureWindowsAsync();
+      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
+      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
+        new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 60; Status = step.Text + "..."; }));
+      Status = "Levando os drivers de rede, disco e chipset deste PC...";
+      var drivers = await DriverExporter.ExportAsync(MediaDir);
+      await UsbWriter.WriteAsync(drive, MediaDir,
+        new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 40; Status = step.Text + "..."; }));
+      Status = $"Pendrive pronto ({drivers.Count} drivers de hardware incluídos). Dê boot por ele no PC que vai ser formatado.";
+    });
+  }
+
   private async Task RunBusy(Func<Task> work)
   {
     if (IsBusy) return;

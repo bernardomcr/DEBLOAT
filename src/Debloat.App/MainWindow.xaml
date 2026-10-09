@@ -171,12 +171,17 @@
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Criar a instalação" />
-            <TextBlock Style="{StaticResource Hint}" Text="Monta a pasta de instalação completa (Windows 11 Pro + seu preset). A gravação direta no pendrive entra na próxima etapa; por enquanto dá para copiar a pasta para um pendrive FAT32." />
+            <TextBlock Style="{StaticResource Hint}" Text="Baixa o Windows (se ainda não baixou), monta a instalação com o seu preset, leva os drivers de rede/disco/chipset deste PC e grava tudo no pendrive. O pendrive é APAGADO." />
+            <DockPanel Margin="0,0,0,8">
+              <ui:Button DockPanel.Dock="Right" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RefreshUsbCommand}" Margin="8,0,0,0" ToolTip="Procurar pendrives" />
+              <ComboBox ItemsSource="{Binding UsbDrives}" SelectedItem="{Binding SelectedUsb}" DisplayMemberPath="Label" />
+            </DockPanel>
             <WrapPanel>
-              <ui:Button Content="Montar instalação" Appearance="Primary" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
+              <ui:Button Content="Gravar pendrive" Appearance="Primary" Icon="{ui:SymbolIcon UsbStick24}" Click="WriteUsb_Click" Margin="0,0,8,8" />
+              <ui:Button Content="Só montar a pasta" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
               <ui:Button Content="Só o autounattend.xml" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,8" />
-              <ui:Button Content="Gravar pendrive (em breve)" Icon="{ui:SymbolIcon UsbStick24}" IsEnabled="False" Margin="0,0,8,8" />
             </WrapPanel>
+            <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0" Text="Só aparecem pendrives USB. HDs, SSDs e o disco do Windows nunca entram na lista." />
           </StackPanel>
         </ScrollViewer>
       </TabItem>
