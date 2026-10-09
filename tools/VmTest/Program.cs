@@ -14,7 +14,8 @@ const string VmName = "DEBLOAT-Teste";
 string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DEBLOAT", "vmtest");
 string shots = Path.Combine(root, "telas");
 string log = Path.Combine(root, "log.txt");
-int minutes = args.Length > 0 ? int.Parse(args[0]) : 90;
+int minutes = args.Select(a => int.TryParse(a, out int m) ? m : 0).FirstOrDefault(m => m > 0, 90);
+bool reuse = args.Contains("--reusar");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
 File.WriteAllText(log, "");
 var logLock = new object();
@@ -31,31 +32,48 @@ try
 {
   string esd = Directory.GetFiles(Path.Combine(root, "..", "cache"), "*.esd").Single();
   string media = Path.Combine(root, "midia");
-  string iso = Path.Combine(root, "teste.iso");
-  string vhd = Path.Combine(root, "disco.vhdx");
+  // ISO e disco ficam numa pasta do sistema: no 1º teste o Hyper-V disse "anexo não encontrado" com a ISO no AppData.
+  string vmDir = Directory.CreateDirectory(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DEBLOAT-VM")).FullName;
+  string iso = Path.Combine(vmDir, "teste.iso");
+  string vhd = Path.Combine(vmDir, "disco.vhdx");
 
   Log("Removendo VM antiga, se houver");
   await Ps($"if( Get-VM -Name '{VmName}' -ErrorAction SilentlyContinue ) {{ Stop-VM -Name '{VmName}' -TurnOff -Force; Remove-VM -Name '{VmName}' -Force }}; Remove-Item -LiteralPath '{vhd}' -ErrorAction SilentlyContinue");
 
-  Log("Montando a mídia (preset padrão + apagar disco 0)");
   var options = new DebloatOptions { WipeDisk0 = true };
-  await MediaBuilder.BuildAsync(esd, media, "Professional", new UnattendBuilder().BuildBytes(options),
-    new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+  byte[] xml = new UnattendBuilder().BuildBytes(options);
+  if (reuse && File.Exists(Path.Combine(media, "setup.exe")))
+  {
+    Log("Reaproveitando a mídia; só o autounattend.xml é novo");
+    File.WriteAllBytes(Path.Combine(media, "autounattend.xml"), xml);
+  }
+  else
+  {
+    Log("Montando a mídia (preset padrão + apagar disco 0)");
+    await MediaBuilder.BuildAsync(esd, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+  }
+  foreach (var stale in Directory.EnumerateFiles(shots)) File.Delete(stale);
   Log("Gerando a ISO");
   IsoWriter.Write(media, iso);
 
   Log("Criando a VM");
-  await Ps($"""
-    New-VM -Name '{VmName}' -Generation 2 -MemoryStartupBytes 6GB -NewVHDPath '{vhd}' -NewVHDSizeBytes 80GB -SwitchName 'Default Switch' | Out-Null
-    Set-VMMemory -VMName '{VmName}' -DynamicMemoryEnabled $false
-    Set-VMProcessor -VMName '{VmName}' -Count 4
-    Set-VMFirmware -VMName '{VmName}' -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
-    Set-VMKeyProtector -VMName '{VmName}' -NewLocalKeyProtector
-    Enable-VMTPM -VMName '{VmName}'
-    $dvd = Add-VMDvdDrive -VMName '{VmName}' -Path '{iso}' -Passthru
-    Set-VMFirmware -VMName '{VmName}' -FirstBootDevice $dvd
-    Set-VM -Name '{VmName}' -AutomaticCheckpointsEnabled $false -CheckpointType Disabled
-    Start-VM -Name '{VmName}'
+  await Ps($$"""
+    New-VM -Name '{{VmName}}' -Generation 2 -MemoryStartupBytes 6GB -NewVHDPath '{{vhd}}' -NewVHDSizeBytes 80GB -SwitchName 'Default Switch' | Out-Null
+    Set-VMMemory -VMName '{{VmName}}' -DynamicMemoryEnabled $false
+    Set-VMProcessor -VMName '{{VmName}}' -Count 4
+    Set-VMFirmware -VMName '{{VmName}}' -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
+    Set-VMKeyProtector -VMName '{{VmName}}' -NewLocalKeyProtector
+    Enable-VMTPM -VMName '{{VmName}}'
+    $vmId = (Get-VM -Name '{{VmName}}').Id
+    icacls.exe '{{iso}}' /grant "NT VIRTUAL MACHINE\$($vmId):(R)" | Out-Null
+    $dvd = $null
+    foreach( $try in 1..5 ) {
+      try { $dvd = Add-VMDvdDrive -VMName '{{VmName}}' -Path '{{iso}}' -Passthru; break }
+      catch { if( $try -eq 5 ) { throw }; Start-Sleep -Seconds 10 }   # antivírus ainda lendo a ISO recém-criada
+    }
+    Set-VMFirmware -VMName '{{VmName}}' -FirstBootDevice $dvd
+    Set-VM -Name '{{VmName}}' -AutomaticCheckpointsEnabled $false -CheckpointType Disabled
+    Start-VM -Name '{{VmName}}'
     """);
 
   var scope = new ManagementScope(@"\\.\root\virtualization\v2");
