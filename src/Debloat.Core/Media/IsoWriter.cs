@@ -17,6 +17,28 @@ public static class IsoWriter
 
   public static void Write(string mediaDir, string isoPath, string volumeName = "DEBLOAT_WIN11")
   {
+    mediaDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(mediaDir));   // o IMAPI2 não aceita "/" no caminho
+    // O IMAPI2 não lida com caminhos de mais de 260 caracteres: se a pasta estiver funda, mapeia numa letra (como o subst).
+    char? letter = null;
+    if (Directory.EnumerateFiles(mediaDir, "*", SearchOption.AllDirectories).Any(f => f.Length >= 250))
+    {
+      letter = Enumerable.Range('M', 'Z' - 'M' + 1).Select(c => (char)c).First(c => !Directory.Exists($"{c}:\\"));
+      // Mapeia a pasta-mãe: o IMAPI2 recusa a raiz de uma unidade no AddTree.
+      if (!DefineDosDevice(0, $"{letter}:", Path.GetDirectoryName(mediaDir)!)) throw new IOException("Não deu para mapear a pasta da instalação numa letra de unidade.");
+      mediaDir = Path.Combine($"{letter}:" + Path.DirectorySeparatorChar, Path.GetFileName(mediaDir));
+    }
+    try
+    {
+      WriteCore(mediaDir, isoPath, volumeName);
+    }
+    finally
+    {
+      if (letter is char l) DefineDosDevice(DddRemoveDefinition, $"{l}:", null);
+    }
+  }
+
+  private static void WriteCore(string mediaDir, string isoPath, string volumeName)
+  {
     dynamic fs = Activator.CreateInstance(Type.GetTypeFromProgID("IMAPI2FS.MsftFileSystemImage", throwOnError: true)!)!;
     fs.ChooseImageDefaultsForMediaType(MediaTypeBdr);
     fs.FileSystemsToCreate = FsiFileSystemUdf;
@@ -71,6 +93,11 @@ public static class IsoWriter
     boot.Manufacturer = "DEBLOAT";
     boots.Add(boot);
   }
+
+  private const uint DddRemoveDefinition = 0x2;
+
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  private static extern bool DefineDosDevice(uint flags, string device, string? target);
 
   [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
   private static extern void SHCreateStreamOnFileEx(string file, uint mode, uint attributes, bool create, IStream? template, out IStream stream);

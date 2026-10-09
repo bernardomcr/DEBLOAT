@@ -183,6 +183,28 @@ public partial class MainViewModel : ObservableObject
     });
   }
 
+  [RelayCommand]
+  private async Task BuildIso()
+  {
+    if (!IsAdmin)
+    {
+      Status = "Para montar a instalação, abra o DEBLOAT como administrador.";
+      return;
+    }
+    var dialog = new SaveFileDialog { FileName = "DEBLOAT-Windows11.iso", Filter = "Imagem ISO (*.iso)|*.iso", Title = "Salvar ISO" };
+    if (dialog.ShowDialog() != true) return;
+    await RunBusy(async () =>
+    {
+      if (esdPath is null) await EnsureWindowsAsync();
+      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
+      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
+        new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 90; Status = step.Text + "..."; }));
+      Status = "Gerando a ISO...";
+      await Task.Run(() => IsoWriter.Write(MediaDir, dialog.FileName));
+      Status = $"ISO pronta: {dialog.FileName} (boota em UEFI e BIOS; serve para Ventoy e máquina virtual).";
+    });
+  }
+
   // --- Saves ---
 
   public ObservableCollection<SaveItem> Saves { get; } = [];
