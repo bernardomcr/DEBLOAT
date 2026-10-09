@@ -4,8 +4,8 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- Só no Debug: abre sem UAC para testar a janela. A versão Release usa app.admin.manifest. -->
-        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+        <!-- Versão final: montar a mídia (DISM) e gravar o pendrive exigem administrador. -->
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

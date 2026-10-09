@@ -7,6 +7,7 @@
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round">
   <ui:FluentWindow.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <Style x:Key="SectionTitle" TargetType="TextBlock">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -59,8 +60,9 @@
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Windows 11" />
-            <TextBlock Style="{StaticResource Hint}" Text="Windows 11 Pro em português (Brasil), teclado ABNT2, horário de Brasília. O download da ISO direto da Microsoft entra na próxima etapa." />
-            <ui:Button Content="Baixar a ISO mais recente (em breve)" Icon="{ui:SymbolIcon ArrowDownload24}" IsEnabled="False" Margin="0,0,0,24" />
+            <TextBlock Style="{StaticResource Hint}" Text="Windows 11 Pro em português (Brasil), teclado ABNT2, horário de Brasília. Baixado direto dos servidores da Microsoft, com conferência de integridade." />
+            <ui:Button Content="Baixar o Windows 11 mais recente" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" Command="{Binding DownloadWindowsCommand}" Margin="0,0,0,8" />
+            <TextBlock Style="{StaticResource Hint}" Text="{Binding WindowsVersion}" Margin="0,0,0,24" />
 
             <TextBlock Style="{StaticResource SectionTitle}" Text="Conta" />
             <TextBlock Style="{StaticResource Hint}" Text="Conta local de administrador, sem senha, com login automático." />
@@ -169,16 +171,21 @@
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Criar a instalação" />
-            <TextBlock Style="{StaticResource Hint}" Text="Por enquanto: gere o autounattend.xml e coloque na raiz de um pendrive de instalação do Windows 11. A gravação do pendrive pelo próprio programa entra na próxima etapa." />
-            <StackPanel Orientation="Horizontal">
-              <ui:Button Content="Gerar autounattend.xml" Appearance="Primary" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,0" />
-              <ui:Button Content="Gravar pendrive (em breve)" Icon="{ui:SymbolIcon UsbStick24}" IsEnabled="False" />
-            </StackPanel>
+            <TextBlock Style="{StaticResource Hint}" Text="Monta a pasta de instalação completa (Windows 11 Pro + seu preset). A gravação direta no pendrive entra na próxima etapa; por enquanto dá para copiar a pasta para um pendrive FAT32." />
+            <WrapPanel>
+              <ui:Button Content="Montar instalação" Appearance="Primary" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
+              <ui:Button Content="Só o autounattend.xml" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,8" />
+              <ui:Button Content="Gravar pendrive (em breve)" Icon="{ui:SymbolIcon UsbStick24}" IsEnabled="False" Margin="0,0,8,8" />
+            </WrapPanel>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
     </TabControl>
 
-    <TextBlock Grid.Row="2" Margin="16,8,16,12" Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    <StackPanel Grid.Row="2" Margin="16,8,16,12">
+      <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Height="4" Margin="0,0,0,6"
+                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    </StackPanel>
   </Grid>
 </ui:FluentWindow>

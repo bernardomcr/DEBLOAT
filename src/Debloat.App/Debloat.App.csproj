@@ -8,7 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Debloat.App</RootNamespace>
     <AssemblyName>DEBLOAT</AssemblyName>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(Configuration)' == 'Release'">app.admin.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(Configuration)' != 'Release'">app.manifest</ApplicationManifest>
     <Version>0.1.0</Version>
   </PropertyGroup>
 

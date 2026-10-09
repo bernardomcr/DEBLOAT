@@ -2,7 +2,11 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Diagnostics;
+using System.Net.Http;
+using System.Security.Principal;
 using Debloat.Core.Catalog;
+using Debloat.Core.Media;
 using Debloat.Core.Presets;
 using Microsoft.Win32;
 
@@ -108,6 +112,84 @@ public partial class MainViewModel : ObservableObject
     Dns = SelectedDns.Value,
     SelectedApps = Categories.SelectMany(c => c.Apps).Where(a => a.IsSelected).Select(a => a.Entry.Id).ToList(),
   };
+
+  // --- Windows: download e mídia ---
+
+  private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
+
+  private static string DataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DEBLOAT");
+
+  public static string MediaDir => Path.Combine(DataDir, "midia");
+
+  private static bool IsAdmin => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+
+  [ObservableProperty] private bool isBusy;
+  [ObservableProperty] private double progressValue;
+  [ObservableProperty] private string windowsVersion = "Ainda não baixado.";
+
+  private EsdFile? esd;
+  private string? esdPath;
+
+  [RelayCommand]
+  private async Task DownloadWindows() => await RunBusy(EnsureWindowsAsync);
+
+  private async Task EnsureWindowsAsync()
+  {
+    Status = "Procurando a versão mais recente nos catálogos da Microsoft...";
+    esd ??= await WindowsCatalog.FindLatestAsync(Http);
+    WindowsVersion = $"Windows 11 build {esd.Build} · {esd.Language} · {esd.Size / 1e9:F1} GB (servidores da Microsoft)";
+    string cache = Directory.CreateDirectory(Path.Combine(DataDir, "cache")).FullName;
+    string path = Path.Combine(cache, esd.FileName);
+    var progress = new Progress<DownloadProgress>(p =>
+    {
+      ProgressValue = p.Fraction * 100;
+      Status = p.Done >= p.Total
+        ? "Conferindo a integridade (SHA-256)..."
+        : $"Baixando: {p.Done / 1e9:F2} de {p.Total / 1e9:F2} GB · {p.BytesPerSecond / 1e6:F0} MB/s";
+    });
+    await new SegmentedDownloader(Http).DownloadAsync(esd.Url, path, esd.Size, esd.Sha256, esd.Sha1, progress);
+    foreach (var old in Directory.EnumerateFiles(cache, "*.esd").Where(f => f != path)) File.Delete(old);
+    esdPath = path;
+    Status = "Windows baixado e conferido.";
+  }
+
+  [RelayCommand]
+  private async Task BuildMedia()
+  {
+    if (!IsAdmin)
+    {
+      Status = "Para montar a instalação, abra o DEBLOAT como administrador.";
+      return;
+    }
+    await RunBusy(async () =>
+    {
+      if (esdPath is null) await EnsureWindowsAsync();
+      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
+      var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 100; Status = step.Text + "..."; });
+      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
+      Status = $"Instalação montada em {MediaDir}.";
+      Process.Start(new ProcessStartInfo("explorer.exe", $"\"{MediaDir}\"") { UseShellExecute = true });
+    });
+  }
+
+  private async Task RunBusy(Func<Task> work)
+  {
+    if (IsBusy) return;
+    IsBusy = true;
+    ProgressValue = 0;
+    try
+    {
+      await work();
+    }
+    catch (Exception e)
+    {
+      Status = $"Não deu certo: {e.Message}";
+    }
+    finally
+    {
+      IsBusy = false;
+    }
+  }
 
   [RelayCommand]
   private void ExportXml()
