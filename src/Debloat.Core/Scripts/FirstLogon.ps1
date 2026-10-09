@@ -5,9 +5,18 @@ $root = 'C:\Debloat'
 $logs = Join-Path $root 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $hasBattery = [bool](Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue)
+$started = Get-Date
 
 function Write-Log([string] $File, [string] $Text) {
-	"[{0:HH:mm:ss}] {1}" -f (Get-Date), $Text | Add-Content -LiteralPath (Join-Path $logs $File) -Encoding UTF8
+	# Tenta de novo se o arquivo estiver aberto (na VM, o log aberto no Bloco de Notas fez uma linha sumir).
+	foreach( $try in 1..5 ) {
+		try {
+			"[{0:HH:mm:ss}] {1}" -f (Get-Date), $Text | Add-Content -LiteralPath (Join-Path $logs $File) -Encoding UTF8 -ErrorAction Stop
+			return
+		} catch {
+			Start-Sleep -Milliseconds 300
+		}
+	}
 }
 
 # --- Telemetria: serviço e tarefas agendadas ---
@@ -30,9 +39,6 @@ foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
 powercfg.exe /setactive SCHEME_BALANCED
 if( -not $hasBattery ) {
 	powercfg.exe /hibernate off
-	# Sobreposição "Melhor desempenho" do modo de energia (conferir em VM).
-	$overlay = 'ded574b5-45a0-4f42-8737-46345c09c238'
-	reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' /v ActiveOverlayAcPowerScheme /t REG_SZ /d $overlay /f | Out-Null
 }
 
 # --- DNS ---
@@ -191,6 +197,12 @@ if( $apps.Count -gt 0 ) {
 					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
 					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture, '--force' ) }
 					$code = Invoke-Winget $wingetArgs
+					# Segunda tentativa para falhas passageiras (na VM o instalador do Hydra travou uma vez e na outra passou).
+					# Não repete "já instalado" (-1978335189) nem hash desatualizado (-1978335215): esses não mudam.
+					if( $code -ne 0 -and $code -notin @( -1978335189, -1978335215 ) ) {
+						Start-Sleep -Seconds 10
+						$code = Invoke-Winget $wingetArgs
+					}
 					if( $code -ne 0 -and $app.fallbackUrl ) { Install-FromVendor $app }
 				}
 				'msstore' {
@@ -222,6 +234,8 @@ if( $apps.Count -gt 0 ) {
 		}
 	}
 }
+
+Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
 # --- Sudo do Windows (24H2+) ---
 if( Get-Command sudo.exe -ErrorAction SilentlyContinue ) { sudo.exe config --enable normal | Out-Null }

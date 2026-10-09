@@ -91,4 +91,7 @@ Set-Policy 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' 'HwSchMode' 2
 if( -not $hasBattery ) {
 	# Desktop: sem "Localizar meu dispositivo"; num notebook ele fica (acha o notebook roubado).
 	Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice' 'AllowFindMyDevice' 0
+	# Modo de energia "Melhor desempenho" (sobreposição do plano Equilibrado). Fica aqui porque a chave só aceita
+	# escrita do SYSTEM: no primeiro login deu "Acesso negado" na VM.
+	reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' /v ActiveOverlayAcPowerScheme /t REG_SZ /d 'ded574b5-45a0-4f42-8737-46345c09c238' /f | Out-Null
 }
