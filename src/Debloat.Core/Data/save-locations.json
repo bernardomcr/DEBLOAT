@@ -1,0 +1,27 @@
+{
+  "_comment": "Pastas onde emuladores de Steam e cracks gravam os saves. Cada subpasta numérica é um AppID da Steam (o nome do jogo vem do manifesto do Ludusavi/Steam). 'verified' = caminho confirmado em fonte; os outros são conhecidos da comunidade e precisam ser conferidos em teste. Os saves oficiais (Steam, Epic, jogos comuns) vêm do manifesto do Ludusavi, não desta lista.",
+  "roots": [
+    { "label": "CODEX / PLAZA", "path": "%PUBLIC%\\Documents\\Steam\\CODEX", "layout": "appid", "verified": true },
+    { "label": "RUNE", "path": "%PUBLIC%\\Documents\\Steam\\RUNE", "layout": "appid", "verified": true },
+    { "label": "Goldberg Emulator", "path": "%APPDATA%\\Goldberg SteamEmu Saves", "layout": "appid", "verified": true },
+    { "label": "Goldberg (gbe_fork)", "path": "%APPDATA%\\GSE Saves", "layout": "appid", "verified": false },
+    { "label": "OnlineFix", "path": "%PUBLIC%\\Documents\\OnlineFix", "layout": "appid", "verified": false },
+    { "label": "EMPRESS", "path": "%APPDATA%\\EMPRESS", "layout": "appid", "verified": false },
+    { "label": "EMPRESS (pública)", "path": "%PUBLIC%\\Documents\\EMPRESS", "layout": "appid", "verified": false },
+    { "label": "CODEX (antigo)", "path": "%APPDATA%\\Steam\\CODEX", "layout": "appid", "verified": false },
+    { "label": "Steam pública (outros grupos)", "path": "%PUBLIC%\\Documents\\Steam", "layout": "group-appid", "verified": false },
+    { "label": "RELOADED", "path": "%PROGRAMDATA%\\Steam\\RLD!", "layout": "appid", "verified": false },
+    { "label": "ProgramData Steam (outros grupos)", "path": "%PROGRAMDATA%\\Steam", "layout": "group-appid", "verified": false },
+    { "label": "SKIDROW", "path": "%LOCALAPPDATA%\\SKIDROW", "layout": "appid", "verified": false },
+    { "label": "SKIDROW (Documentos)", "path": "%USERPROFILE%\\Documents\\SKIDROW", "layout": "appid", "verified": false },
+    { "label": "SmartSteamEmu", "path": "%APPDATA%\\SmartSteamEmu", "layout": "appid", "verified": false },
+    { "label": "CreamAPI", "path": "%APPDATA%\\CreamAPI", "layout": "appid", "verified": false },
+    { "label": "Ubisoft (emulador Goldberg)", "path": "%APPDATA%\\Goldberg UplayEmu Saves", "layout": "named", "verified": false },
+    { "label": "Epic (Nemirtingas)", "path": "%APPDATA%\\NemirtingasEpicEmu", "layout": "named", "verified": false }
+  ],
+  "markers": {
+    "_comment": "Arquivos que indicam uma pasta de jogo com emulador; na varredura profunda, procuramos saves locais perto deles (SmartSteamEmu, ALI213, steam_settings etc.).",
+    "files": [ "steam_emu.ini", "steam_api.ini", "cream_api.ini", "OnlineFix.ini", "ALI213.ini", "SmartSteamEmu.ini", "CODEX.ini", "steam_interfaces.txt" ],
+    "localSaveFolders": [ "steam_settings\\saves", "SmartSteamEmu", "Profile", "Profiles", "STEAM_SAVES", "Saves", "SaveGames" ]
+  }
+}

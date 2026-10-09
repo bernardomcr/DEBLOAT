@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/external/" />
+  <Folder Name="/external/unattend-generator/">
+    <Project Path="external/unattend-generator/UnattendGenerator.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Debloat.App/Debloat.App.csproj" />
+    <Project Path="src/Debloat.Core/Debloat.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Debloat.Core.Tests/Debloat.Core.Tests.csproj" />
+  </Folder>
+</Solution>

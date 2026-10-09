@@ -1,0 +1,184 @@
+<ui:FluentWindow x:Class="Debloat.App.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:local="clr-namespace:Debloat.App"
+                 Title="DEBLOAT" Width="960" Height="680" MinWidth="760" MinHeight="520"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round">
+  <ui:FluentWindow.Resources>
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="Hint" TargetType="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,0,0,16" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="Line" TargetType="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,3" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    </Style>
+  </ui:FluentWindow.Resources>
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <ui:TitleBar Grid.Row="0" Title="DEBLOAT — Windows 11 limpo, do jeito certo" />
+
+    <TabControl Grid.Row="1" Margin="12,4,12,0">
+
+      <!-- ESTE PC -->
+      <TabItem Header="Este PC">
+        <ScrollViewer Padding="16">
+          <StackPanel>
+            <TextBlock Style="{StaticResource SectionTitle}" Text="O que encontrei neste PC" />
+            <TextBlock Style="{StaticResource Hint}" Text="O preset se ajusta ao hardware. Nada aqui é apagado sem você confirmar na aba Criar." />
+            <ui:Card Margin="0,0,0,8">
+              <StackPanel>
+                <TextBlock Style="{StaticResource Line}" FontWeight="SemiBold" Text="{Binding MachineKind}" />
+                <TextBlock Style="{StaticResource Line}" Text="{Binding PowerText}" />
+                <TextBlock Style="{StaticResource Line}" Text="{Binding HelloText}" />
+                <TextBlock Style="{StaticResource Line}" Text="{Binding PenText}" />
+              </StackPanel>
+            </ui:Card>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- WINDOWS -->
+      <TabItem Header="Windows">
+        <ScrollViewer Padding="16">
+          <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Windows 11" />
+            <TextBlock Style="{StaticResource Hint}" Text="Windows 11 Pro em português (Brasil), teclado ABNT2, horário de Brasília. O download da ISO direto da Microsoft entra na próxima etapa." />
+            <ui:Button Content="Baixar a ISO mais recente (em breve)" Icon="{ui:SymbolIcon ArrowDownload24}" IsEnabled="False" Margin="0,0,0,24" />
+
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Conta" />
+            <TextBlock Style="{StaticResource Hint}" Text="Conta local de administrador, sem senha, com login automático." />
+            <ui:TextBox Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Nome de usuário" Margin="0,0,0,24" />
+
+            <TextBlock Style="{StaticResource SectionTitle}" Text="DNS" />
+            <TextBlock Style="{StaticResource Hint}" Text="Aplicado em todas as placas de rede, com DNS criptografado (DoH)." />
+            <ComboBox ItemsSource="{Binding DnsOptions}" SelectedItem="{Binding SelectedDns}" DisplayMemberPath="Label" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- DEBLOAT -->
+      <TabItem Header="Debloat">
+        <ScrollViewer Padding="16">
+          <StackPanel>
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Preset Recomendado" />
+            <TextBlock Style="{StaticResource Hint}" Text="Já vem pronto. Cada escolha foi pesada entre o que se ganha e o que se perde." />
+            <ui:Card Margin="0,0,0,16">
+              <ItemsControl ItemsSource="{Binding PresetHighlights}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel Margin="0,4">
+                      <ui:SymbolIcon Symbol="Checkmark24" Foreground="{DynamicResource SystemAccentColorPrimaryBrush}" Margin="0,0,10,0" VerticalAlignment="Top" />
+                      <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    </DockPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ui:Card>
+
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Visual" />
+            <ui:CardControl Header="Modo escuro" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding DarkMode}" /></ui:CardControl>
+            <ui:CardControl Header="Barra de tarefas à esquerda" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding LeftTaskbar}" /></ui:CardControl>
+            <ui:CardControl Header="Menu de contexto clássico (botão direito completo)" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding ClassicContextMenu}" /></ui:CardControl>
+            <ui:CardControl Header="Visualizador de Fotos antigo como padrão" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding ClassicPhotoViewer}" /></ui:CardControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- APPS -->
+      <TabItem Header="Apps">
+        <Grid Margin="16">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <StackPanel>
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Apps e pré-requisitos" />
+            <TextBlock Style="{StaticResource Hint}" Text="{Binding AppsSummary, StringFormat='Instalados sozinhos no primeiro login. {0}.'}" />
+          </StackPanel>
+          <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Categories}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <ui:CardExpander Margin="0,0,0,6" IsExpanded="False">
+                    <ui:CardExpander.Header>
+                      <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Content="Marcar/desmarcar todos" Appearance="Transparent" Margin="0,0,12,0"
+                                   Command="{Binding ToggleAllCommand}" />
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" VerticalAlignment="Center" Margin="0,0,16,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </ui:CardExpander.Header>
+                    <ItemsControl ItemsSource="{Binding Apps}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox Width="270" Margin="0,2" IsChecked="{Binding IsSelected}" Content="{Binding Entry.Name}"
+                                    ToolTip="{Binding Entry.Description}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ui:CardExpander>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+
+      <!-- BACKUP -->
+      <TabItem Header="Backup">
+        <ScrollViewer Padding="16">
+          <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Levar para o Windows novo" />
+            <TextBlock Style="{StaticResource Hint}" Text="Chega na próxima etapa. Tudo é salvo no pendrive ou em outro disco e volta para o lugar de origem depois da instalação." />
+            <ui:CardControl Header="Saves de jogos" Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}" IsEnabled="False">
+              <TextBlock Text="Varredura com o manifesto do Ludusavi + pastas de emuladores (CODEX, RUNE, Goldberg, OnlineFix…). Você escolhe os jogos." TextWrapping="Wrap" MaxWidth="360" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </ui:CardControl>
+            <ui:CardControl Header="Redes Wi-Fi" Margin="0,0,0,4" Icon="{ui:SymbolIcon Wifi124}" IsEnabled="False" />
+            <ui:CardControl Header="Navegadores" Margin="0,0,0,4" Icon="{ui:SymbolIcon Globe24}" IsEnabled="False">
+              <TextBlock Text="Firefox volta logado. Chrome/Edge/Brave: extensões e favoritos; login e senhas pela sincronização da conta." TextWrapping="Wrap" MaxWidth="360" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </ui:CardControl>
+            <ui:CardControl Header="Configuração do ShareX" Margin="0,0,0,4" Icon="{ui:SymbolIcon Screenshot24}" IsEnabled="False" />
+            <ui:CardControl Header="Pastas (Área de Trabalho, Documentos, Downloads…)" Margin="0,0,0,4" Icon="{ui:SymbolIcon Folder24}" IsEnabled="False" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- CRIAR -->
+      <TabItem Header="Criar">
+        <ScrollViewer Padding="16">
+          <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Criar a instalação" />
+            <TextBlock Style="{StaticResource Hint}" Text="Por enquanto: gere o autounattend.xml e coloque na raiz de um pendrive de instalação do Windows 11. A gravação do pendrive pelo próprio programa entra na próxima etapa." />
+            <StackPanel Orientation="Horizontal">
+              <ui:Button Content="Gerar autounattend.xml" Appearance="Primary" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,0" />
+              <ui:Button Content="Gravar pendrive (em breve)" Icon="{ui:SymbolIcon UsbStick24}" IsEnabled="False" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <TextBlock Grid.Row="2" Margin="16,8,16,12" Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+  </Grid>
+</ui:FluentWindow>
