@@ -123,8 +123,9 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 ## Fases
 
 1. **Núcleo** — [x] preset → autounattend.xml (gerador schneegans) · [x] catálogo de apps + DNS
-   no primeiro login · [x] janela com abas e exportar XML · [ ] download da ISO pelo catálogo do
-   Media Creation Tool (links diretos do CDN + hash, download segmentado) · [ ] gravar pendrive
+   no primeiro login · [x] janela com abas e exportar XML · [x] download do Windows pelos catálogos
+   da MCT (CDN da Microsoft + SHA-256, várias conexões; 25H2 5 GB em ~60 s) · [x] montar a pasta de
+   instalação com DISM (testado: 232 s, boot.wim 0,56 GB + install.swm 3,7 + 2,2 GB) · [ ] gravar pendrive
    (GPT/UEFI, split do install.wim >4 GB, `$WinPEDriver$` com drivers de rede/disco, instaladores
    dos apps em cache offline no pendrive).
 2. **Migração e acabamento** — backup (saves, Wi-Fi, navegadores, ShareX, pastas), debloat

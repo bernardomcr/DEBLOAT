@@ -28,6 +28,7 @@ public static partial class MediaBuilder
 
     progress?.Report(new("Extraindo os arquivos de instalação", 0.05));
     await DismAsync($"/Apply-Image /ImageFile:\"{esdPath}\" /Index:1 /ApplyDir:\"{mediaDir}\"", ct);
+    File.Delete(Path.Combine(mediaDir, "__chunk_data"));   // sobra do formato .esd; a mídia oficial não tem
 
     progress?.Report(new("Montando o ambiente de instalação (boot.wim)", 0.15));
     string bootWim = Path.Combine(sources, "boot.wim");
