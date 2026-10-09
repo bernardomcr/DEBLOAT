@@ -32,6 +32,29 @@ void Log(string text)
 
 try
 {
+  int typeAt = Array.IndexOf(args, "--teclar");
+  if (typeAt >= 0)
+  {
+    // Digita na VM: cada argumento depois de --teclar é um texto, ou {SHIFT+F10} / {ENTER} / {ESC}.
+    var typeScope = new ManagementScope(@"\\.\root\virtualization\v2");
+    typeScope.Connect();
+    string id = (string)Query(typeScope, $"SELECT * FROM Msvm_ComputerSystem WHERE ElementName='{VmName}'").First()["Name"];
+    var kb = Query(typeScope, $"SELECT * FROM Msvm_Keyboard WHERE SystemName='{id}'").First();
+    foreach (string part in args.Skip(typeAt + 1))
+    {
+      switch (part)
+      {
+        case "{SHIFT+F10}":
+          kb.InvokeMethod("PressKey", [0x10]); kb.InvokeMethod("TypeKey", [0x79]); kb.InvokeMethod("ReleaseKey", [0x10]);
+          break;
+        case "{ENTER}": kb.InvokeMethod("TypeKey", [0x0D]); break;
+        case "{ESC}": kb.InvokeMethod("TypeKey", [0x1B]); break;
+        default: kb.InvokeMethod("TypeText", [part]); break;
+      }
+      await Task.Delay(1500);
+    }
+    return;
+  }
   if (watchOnly)
   {
     var watchScope = new ManagementScope(@"\\.\root\virtualization\v2");

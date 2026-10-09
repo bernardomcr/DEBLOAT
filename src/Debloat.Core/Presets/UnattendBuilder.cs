@@ -44,7 +44,7 @@ public sealed class UnattendBuilder
       PESettings = options.WipeDisk0
         ? new GeneratePESettings(
             PartitionSettings: new UnattendedPartitionSettings(
-              new GeneratedTargetDiskSettings(index: 0, assertNoPartitions: false), PartitionLayout.GPT, RecoveryMode.Partition),
+              new GeneratedTargetDiskSettings(minSizeGiB: 30, index: 0, assertNoPartitions: false), PartitionLayout.GPT, RecoveryMode.Partition),
             InstallFromSettings: new IndexInstallFromSettings(1),     // a mídia do DEBLOAT só tem a edição escolhida
             PagingFileSettings: new AutomaticPagingFileSettings(),
             DisableDefender: false, Disable8Dot3Names: false, PauseBeforeFormatting: false, PauseBeforeReboot: false,
