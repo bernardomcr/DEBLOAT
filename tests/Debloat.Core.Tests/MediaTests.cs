@@ -108,3 +108,26 @@ public class UsbLayoutTests
     Assert.DoesNotContain("ROOT\\", Debloat.Core.Media.DriverExporter.PhysicalBuses);
   }
 }
+
+public class InPlaceScriptTests
+{
+  private static readonly string Script = Debloat.Core.Resources.Script("InPlace-instalar.cmd");
+
+  [Fact]
+  public void So_formata_a_particao_com_o_mesmo_token()
+  {
+    int tokenCheck = Script.IndexOf("if \"!T!\"==\"%TOKEN%\"", StringComparison.Ordinal);
+    int notFound = Script.IndexOf("if not defined TGT", StringComparison.Ordinal);
+    int format = Script.IndexOf("format %TGT%", StringComparison.Ordinal);
+    Assert.True(tokenCheck > 0 && notFound > tokenCheck && format > notFound, "a checagem do token tem que vir antes do format");
+    Assert.Contains("if /i \"%TGT%\"==\"%SRC%\" goto :abortar", Script);
+  }
+
+  [Fact]
+  public void Formata_uma_vez_e_nunca_o_disco_inteiro()
+  {
+    Assert.Single(System.Text.RegularExpressions.Regex.Matches(Script, @"^format ", System.Text.RegularExpressions.RegexOptions.Multiline));
+    Assert.DoesNotContain("diskpart", Script, StringComparison.OrdinalIgnoreCase);
+    Assert.DoesNotContain("clean", Script, StringComparison.OrdinalIgnoreCase);
+  }
+}

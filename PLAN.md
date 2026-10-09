@@ -137,8 +137,16 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 2. **Migração e acabamento** — backup (saves, Wi-Fi, navegadores, ShareX, pastas), debloat
    direto na imagem (estilo Tiny11 seguro, sem "core"), driver de vídeo oficial + Hz máximo,
    pasta `C:\Debloat` com desfazer por ajuste e relatório "Seu PC está pronto".
-3. **Reinstalar sem pendrive** (ambiente de instalação no próprio disco) — só depois de tudo
-   testado em VM.
+3. **Reinstalar sem pendrive** — código escrito (`Media/InPlaceInstaller.cs` + `Scripts/InPlace-*`),
+   **não exposto na janela até passar em VM**. `setup.exe /Auto Clean` foi descartado: a Microsoft não
+   aceita arquivo de resposta com /Auto (sem debloat). Fluxo: encolhe o C: e cria `DEBLOAT-SETUP`
+   (mídia + WinPE próprio) → marcador com token em `C:\DEBLOAT-ALVO.txt` → BitLocker suspenso → entrada
+   de ramdisk de **uso único** (bootsequence) → no WinPE o `instalar.cmd` só formata a partição com o
+   mesmo token (falha antes disso = volta ao Windows atual), aplica com DISM, injeta drivers, `bcdboot`,
+   unattend em `Panther` → `SetupComplete.cmd` apaga a partição temporária, devolve o espaço ao C: e
+   remove a entrada de boot. Só UEFI. Não zera EFI/recuperação (o pendrive zera). Ideia do usuário a
+   seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
+   ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
 ## A conferir em máquina virtual
 

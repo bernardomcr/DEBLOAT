@@ -93,7 +93,7 @@ public static class UsbWriter
     return (boot, data);
   }
 
-  private static async Task CopyTreeAsync(string from, string to, long total, Action<double> progress, CancellationToken ct)
+  internal static async Task CopyTreeAsync(string from, string to, long total, Action<double> progress, CancellationToken ct)
   {
     long done = 0;
     byte[] buffer = new byte[4 << 20];
