@@ -16,7 +16,9 @@ public record AppEntry(
   string? Architecture = null,
   string? Args = null,
   string? Asset = null,
-  IReadOnlyList<string>? Requires = null
+  IReadOnlyList<string>? Requires = null,
+  string? FallbackUrl = null,     // plano B: link oficial do fabricante, se o manifesto do winget estiver desatualizado
+  string? Signer = null           // o plano B só instala se a assinatura digital for deste fabricante
 );
 
 /// <summary>Catálogo de apps e pré-requisitos (Data\apps.json).</summary>
@@ -59,6 +61,6 @@ public sealed class AppCatalog
 
   /// <summary>JSON enxuto que o FirstLogon.ps1 lê.</summary>
   public static string ToScriptJson(IEnumerable<AppEntry> apps) => JsonSerializer.Serialize(
-    apps.Select(a => new { a.Name, a.Source, a.Package, a.Architecture, a.Args, a.Asset }),
+    apps.Select(a => new { a.Id, a.Name, a.Source, a.Package, a.Architecture, a.Args, a.Asset, a.FallbackUrl, a.Signer }),
     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true });
 }

@@ -76,7 +76,7 @@
     {"id": "gog", "name": "GOG Galaxy", "category": "games", "source": "winget", "package": "GOG.Galaxy", "default": false},
     {"id": "playnite", "name": "Playnite", "category": "games", "source": "winget", "package": "Playnite.Playnite", "default": false, "description": "Junta todas as bibliotecas de jogos num lugar só."},
     {"id": "hydra", "name": "Hydra Launcher", "category": "games", "source": "winget", "package": "HydraLauncher.Hydra", "default": true},
-    {"id": "wand", "name": "Wand (antigo WeMod)", "category": "games", "source": "winget", "package": "WeMod.WeMod", "default": true},
+    {"id": "wand", "name": "Wand (antigo WeMod)", "category": "games", "source": "winget", "package": "WeMod.WeMod", "args": "/s", "default": true, "fallbackUrl": "https://api.wemod.com/client/download", "signer": "WeMod LLC", "description": "O manifesto do winget costuma ficar para trás; plano B pelo link oficial com assinatura conferida."},
     {"id": "league", "name": "League of Legends (servidor BR)", "category": "games", "source": "winget", "package": "RiotGames.LeagueOfLegends.BR", "default": false, "description": "Instala o Riot Client junto."},
     {"id": "rockstar", "name": "Rockstar Games Launcher", "category": "games", "source": "winget", "package": "RockstarGames.Launcher", "default": false},
     {"id": "paradox", "name": "Paradox Launcher", "category": "games", "source": "winget", "package": "ParadoxInteractive.ParadoxLauncher", "default": false},

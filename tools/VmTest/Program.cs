@@ -19,7 +19,7 @@ bool reuse = args.Contains("--reusar");
 bool watchOnly = args.Contains("--acompanhar");  // só acompanha a VM que já está rodando (não recria nada)
 if (watchOnly) log = Path.Combine(root, "log-acompanhar.txt");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
-if (!args.Contains("--teclar") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
+if (!args.Contains("--teclar") && !args.Contains("--coletar") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
 var logLock = new object();
 void Log(string text)
 {
@@ -32,6 +32,34 @@ void Log(string text)
 
 try
 {
+  if (args.Contains("--coletar"))
+  {
+    // Desliga a VM, abre o disco virtual aqui em somente leitura, copia os logs e liga a VM de novo.
+    string vhdPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DEBLOAT-VM", "disco.vhdx");
+    string dest = Path.Combine(root, "logs-vm", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+    Directory.CreateDirectory(dest);
+    await Ps($$"""
+      Stop-VM -Name '{{VmName}}' -Force -ErrorAction SilentlyContinue
+      $disk = Mount-VHD -Path '{{vhdPath}}' -ReadOnly -Passthru | Get-Disk
+      try {
+        $win = Get-Partition -DiskNumber $disk.Number | Where-Object { $_.Type -eq 'Basic' -and $_.Size -gt 20GB } | Select-Object -First 1
+        if( -not $win.DriveLetter ) { $win | Add-PartitionAccessPath -AssignDriveLetter; $win = Get-Partition -DiskNumber $disk.Number -PartitionNumber $win.PartitionNumber }
+        $r = "$($win.DriveLetter):"
+        $copy = @{ 'debloat' = "$r\Debloat\logs"; 'scripts' = "$r\Windows\Setup\Scripts"; 'panther' = "$r\Windows\Panther" }
+        foreach( $k in $copy.Keys ) {
+          if( Test-Path -LiteralPath $copy[$k] ) { robocopy.exe $copy[$k] (Join-Path '{{dest}}' $k) *.log *.txt *.json /S /R:0 /W:0 /NFL /NDL /NJH /NJS | Out-Null }
+        }
+        Get-ChildItem "$r\Users\*\AppData\Local\Temp\UserOnce.log" -ErrorAction SilentlyContinue | Copy-Item -Destination '{{dest}}'
+        Get-ChildItem "$r\ProgramData\Microsoft\Windows\Start Menu\Programs", "$r\Users\Usuario\AppData\Roaming\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |
+          Select-Object -ExpandProperty BaseName | Sort-Object -Unique | Out-File (Join-Path '{{dest}}' 'atalhos-no-iniciar.txt')
+      } finally {
+        Dismount-VHD -Path '{{vhdPath}}'
+      }
+      Start-VM -Name '{{VmName}}'
+      """);
+    Log($"Logs da VM copiados para {dest}");
+    return;
+  }
   int typeAt = Array.IndexOf(args, "--teclar");
   if (typeAt >= 0)
   {

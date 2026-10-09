@@ -55,3 +55,16 @@ public class CatalogTests
     foreach (var id in mine) Assert.True(catalog.Apps.Single(a => a.Id == id).Default, id);
   }
 }
+
+public class FallbackTests
+{
+  [Fact]
+  public void Plano_B_sempre_exige_assinador()
+  {
+    foreach (var app in AppCatalog.Load().Apps.Where(a => a.FallbackUrl is not null))
+    {
+      Assert.False(string.IsNullOrWhiteSpace(app.Signer), app.Id);
+      Assert.StartsWith("https://", app.FallbackUrl);
+    }
+  }
+}

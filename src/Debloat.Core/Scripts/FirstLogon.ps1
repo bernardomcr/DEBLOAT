@@ -133,15 +133,33 @@ function Invoke-Winget([string[]] $Arguments) {
 	$code = $LASTEXITCODE
 	$tail = ($output -split "`r?`n" | Where-Object { $_ -match '[A-Za-z]{3,}' } | Select-Object -Last 1)   # só texto (as barras de progresso viravam lixo)
 	Write-Log 'apps.log' "  winget saiu com $code — $tail"
+	return $code
 }
 
 function Install-Downloaded([string] $File, [string] $Arguments) {
 	if( $File -like '*.msi' ) {
-		Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -Wait
+		$p = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -Wait -PassThru
 	} else {
-		Start-Process -FilePath $File -ArgumentList $Arguments -Wait
+		$p = Start-Process -FilePath $File -ArgumentList $Arguments -Wait -PassThru
 	}
+	Write-Log 'apps.log' "  instalador saiu com $($p.ExitCode)"
 	Remove-Item -LiteralPath $File -ErrorAction SilentlyContinue
+	return $p.ExitCode
+}
+
+function Install-FromVendor($App) {
+	# Plano B quando o manifesto do winget está desatualizado: baixa do link oficial do fabricante e só
+	# instala se a assinatura digital for válida E do fabricante esperado (sem hash do winget, é isso que protege).
+	$file = Join-Path $env:TEMP ("debloat-" + $App.id + ".exe")
+	Invoke-WebRequest -Uri $App.fallbackUrl -OutFile $file -UseBasicParsing
+	$sig = Get-AuthenticodeSignature -LiteralPath $file
+	if( $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike "*$($App.signer)*" ) {
+		Write-Log 'apps.log' "  plano B recusado: assinatura $($sig.Status) de '$($sig.SignerCertificate.Subject)'"
+		Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+		return
+	}
+	Write-Log 'apps.log' "  plano B: instalador oficial assinado por $($App.signer)"
+	Install-Downloaded $file $App.args | Out-Null
 }
 
 function Enable-FromMedia([string] $Feature) {
@@ -166,27 +184,37 @@ if( $apps.Count -gt 0 ) {
 			switch( $app.source ) {
 				'feature' {
 					Enable-FromMedia $app.package
+					Write-Log 'apps.log' "  recurso do Windows ativado"
 				}
 				'winget' {
 					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
 					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
 					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture, '--force' ) }
-					Invoke-Winget $wingetArgs
+					$code = Invoke-Winget $wingetArgs
+					if( $code -ne 0 -and $app.fallbackUrl ) { Install-FromVendor $app }
 				}
 				'msstore' {
-					Invoke-Winget @( 'install', '--exact', '--id', $app.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
+					$storeArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
+					$code = Invoke-Winget $storeArgs
+					if( $code -eq -1978335138 ) {
+						# 0x8A15005E: o winget que vem no Windows não reconhece o certificado atual da Loja.
+						# Liga a exceção documentada pela Microsoft só para esta tentativa e desliga em seguida.
+						& $winget settings --enable BypassCertificatePinningForMicrosoftStore | Out-Null
+						$code = Invoke-Winget $storeArgs
+						& $winget settings --disable BypassCertificatePinningForMicrosoftStore | Out-Null
+					}
 				}
 				'url' {
 					$file = Join-Path $env:TEMP ([uri] $app.package).Segments[-1]
 					Invoke-WebRequest -Uri $app.package -OutFile $file -UseBasicParsing
-					Install-Downloaded $file $app.args
+					Install-Downloaded $file $app.args | Out-Null
 				}
 				'github' {
 					$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($app.package)/releases/latest" -Headers @{ 'User-Agent' = 'DEBLOAT' }
 					$asset = $release.assets | Where-Object { $_.name -match $app.asset } | Select-Object -First 1
 					$file = Join-Path $env:TEMP $asset.name
 					Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $file -UseBasicParsing
-					Install-Downloaded $file $app.args
+					Install-Downloaded $file $app.args | Out-Null
 				}
 			}
 		} catch {
