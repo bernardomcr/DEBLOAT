@@ -54,6 +54,9 @@ try
         case "{ENTER}": kb.InvokeMethod("TypeKey", [0x0D]); break;
         case "{ESC}": kb.InvokeMethod("TypeKey", [0x1B]); break;
         case "{WAIT}": await Task.Delay(5000); break;
+        case "{CTRL+HOME}":
+          kb.InvokeMethod("PressKey", [0x11]); kb.InvokeMethod("TypeKey", [0x24]); kb.InvokeMethod("ReleaseKey", [0x11]);
+          break;
         case "{CTRL+END}":
           kb.InvokeMethod("PressKey", [0x11]); kb.InvokeMethod("TypeKey", [0x23]); kb.InvokeMethod("ReleaseKey", [0x11]);
           break;

@@ -56,3 +56,23 @@ public class GeneratedScriptsTests
     }
   }
 }
+
+public class FirstLogonScriptTests
+{
+  private static readonly string Script = Resources.Script("FirstLogon.ps1");
+
+  [Fact]
+  public void Winget_recebe_os_argumentos_de_verdade()
+  {
+    // "& $winget @args" chamava o winget sem argumento nenhum (ajuda + código 0): achado na VM.
+    Assert.DoesNotContain("@args", Script);
+    Assert.Contains("Invoke-Winget $wingetArgs", Script);
+  }
+
+  [Fact]
+  public void Internet_e_testada_por_HTTP_e_nao_por_ping()
+  {
+    Assert.DoesNotContain("Test-Connection", Script);
+    Assert.Contains("msftconnecttest.com", Script);
+  }
+}

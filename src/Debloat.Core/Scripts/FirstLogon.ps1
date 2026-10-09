@@ -96,22 +96,43 @@ $apps = @'
 '@ | ConvertFrom-Json
 
 function Wait-Internet {
-	$deadline = (Get-Date).AddMinutes( 3 )
+	# Mesmo teste que o Windows usa (NCSI). Ping não serve: muita rede/servidor não responde ICMP.
+	$deadline = (Get-Date).AddMinutes( 5 )
 	while( (Get-Date) -lt $deadline ) {
-		if( Test-Connection -TargetName 'cdn.winget.microsoft.com' -Count 1 -Quiet -ErrorAction SilentlyContinue ) { return $true }
+		try {
+			$r = Invoke-WebRequest -Uri 'http://www.msftconnecttest.com/connecttest.txt' -UseBasicParsing -TimeoutSec 5
+			if( $r.Content -like 'Microsoft Connect Test*' ) { return $true }
+		} catch { }
 		Start-Sleep -Seconds 3
 	}
 	return $false
 }
 
 function Get-Winget {
+	# No primeiro login o App Installer pode ainda não estar registrado: o winget.exe existe, mas não funciona.
+	Add-AppxPackage -RegisterByFamilyName -MainPackage 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe' -ErrorAction SilentlyContinue
 	$exe = "$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe"
 	$deadline = (Get-Date).AddMinutes( 5 )
 	while( (Get-Date) -lt $deadline ) {
-		if( Test-Path -LiteralPath $exe ) { return $exe }
-		Start-Sleep -Seconds 2
+		if( Test-Path -LiteralPath $exe ) {
+			$version = & $exe --version 2>$null
+			if( $version -match '^v\d' ) {
+				Write-Log 'apps.log' "winget $version"
+				& $exe source update --disable-interactivity 2>&1 | Out-Null
+				return $exe
+			}
+		}
+		Start-Sleep -Seconds 3
 	}
 	return $null
+}
+
+function Invoke-Winget([string[]] $Arguments) {
+	# Guarda as últimas linhas da saída no log: "saiu com 0" sozinho já escondeu um bug.
+	$output = & $winget @Arguments 2>&1 | Out-String
+	$code = $LASTEXITCODE
+	$tail = ($output -split "`r?`n" | Where-Object { $_.Trim() -and $_ -notmatch '^[\s\-\|/█▒]+$' } | Select-Object -Last 2) -join ' | '
+	Write-Log 'apps.log' "  winget saiu com $code — $tail"
 }
 
 function Install-Downloaded([string] $File, [string] $Arguments) {
@@ -149,12 +170,10 @@ if( $apps.Count -gt 0 ) {
 				'winget' {
 					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
 					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture ) }
-					& $winget @args | Out-Null
-					Write-Log 'apps.log' "  winget saiu com $LASTEXITCODE"
+					Invoke-Winget $wingetArgs
 				}
 				'msstore' {
-					& $winget install --exact --id $app.package --source msstore --silent --accept-package-agreements --accept-source-agreements --disable-interactivity | Out-Null
-					Write-Log 'apps.log' "  winget (Loja) saiu com $LASTEXITCODE"
+					Invoke-Winget @( 'install', '--exact', '--id', $app.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
 				}
 				'url' {
 					$file = Join-Path $env:TEMP ([uri] $app.package).Segments[-1]

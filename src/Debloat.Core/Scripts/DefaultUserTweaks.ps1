@@ -12,6 +12,7 @@ Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement' 
 Set-UserValue $adv 'ShowSyncProviderNotifications' 0     # anúncios do OneDrive no Explorer
 Set-UserValue $adv 'Start_IrisRecommendations' 0         # dicas e atalhos recomendados no Iniciar
 Set-UserValue $adv 'Start_AccountNotifications' 0        # notificações de conta no Iniciar
+Set-UserValue 'Software\Policies\Microsoft\Windows\Explorer' 'HideRecommendedSection' 1   # versão por usuário (a de máquina não vale no Pro; conferir em VM)
 Set-UserValue $adv 'Start_TrackProgs' 0                  # "apps adicionados recentemente" (a "Introdução" aparecia por aqui na VM)
 Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'RotatingLockScreenOverlayEnabled' 0
 Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\Privacy' 'TailoredExperiencesWithDiagnosticDataEnabled' 0
