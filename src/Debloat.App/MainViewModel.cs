@@ -406,15 +406,14 @@ public partial class MainViewModel : ObservableObject
     windows.Done = true;
 
     byte[] xml = new UnattendBuilder(catalog).BuildBytes(options);
-    var features = apps.Where(a => a.Source == "feature").Select(a => a.Package).ToList();   // .NET 3.5 já vem na imagem
     var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * share; Status = step.Text + "..."; });
     if (preparedFolder is not null)
     {
-      await MediaBuilder.BuildFromFolderAsync(preparedFolder, MediaDir, "Professional", xml, progress, features: features);
+      await MediaBuilder.BuildFromFolderAsync(preparedFolder, MediaDir, "Professional", xml, progress);
     }
     else
     {
-      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress, features: features);
+      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
     }
 
     Status = "Pondo os instaladores na mídia...";

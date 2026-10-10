@@ -421,7 +421,7 @@ function Initialize-Online {
 }
 
 function Enable-FromMedia([string] $Feature) {
-	# O DEBLOAT já ativa o .NET 3.5 na imagem ao montar a mídia; isto só roda se não veio (leva uns 5 min).
+	# Leva uns 5 min. (Ativar na imagem ao montar a mídia falhou no DISM do PC host: 0x80070057 em get_OSVersion.)
 	if( (Get-WindowsOptionalFeature -Online -FeatureName $Feature -ErrorAction SilentlyContinue).State -eq 'Enabled' ) {
 		Write-Log 'apps.log' '  já veio ativado na imagem'
 		return

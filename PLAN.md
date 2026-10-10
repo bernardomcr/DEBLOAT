@@ -208,8 +208,9 @@ ISO/pendrive. Sem textos explicativos na interface.
 
 ## Velocidade do primeiro login (10/10/2026)
 
-1. **.NET 3.5 na imagem:** `MediaBuilder` monta o install.wim e ativa o NetFx3 com a fonte sources\sxs da
-   própria mídia (1–3 min no PC que monta a mídia). No primeiro login ele já está ativo (5 min a menos).
+1. ~~.NET 3.5 na imagem~~ **descartado**: montar o install.wim e rodar `/Enable-Feature` falha no DISM do PC
+   host (Win 11 25H2, DISM 26100.9278) com "initialization error" 87 — `get_OSVersion` 0x80070057 até para
+   `/Get-CurrentEdition`, com qualquer pasta de montagem/rascunho. O .NET 3.5 segue no primeiro login, na fila (~5 min).
 2. **Duas filas:** MSI um por vez (o Windows Installer só aceita um) + até 3 instaladores NSIS/Inno/MSIX em
    paralelo. Erro (ex.: 1618) volta para a fila normal no fim. Simulado no PowerShell 5.1 com instaladores
    falsos: paralelos junto com o MSI, 1618 refeito na fila normal, 6 de 6.
@@ -219,7 +220,7 @@ ISO/pendrive. Sem textos explicativos na interface.
 - Excluir do Defender: descartado pelo usuário.
 - **Versões:** os instaladores são os mais novos do dia em que a mídia é montada (cache de 3 dias). Mídia com
   mais de 14 dias (`DEBLOAT\apps\criado.txt`) + internet → o primeiro login ignora e baixa tudo de novo.
-- Estimativa: lista de 12 min → ~4–5 min. Conferir na rodada final da VM.
+- Estimativa: lista de 12 min → ~8–9 min (5 deles do .NET 3.5). Conferir na rodada final da VM.
 
 ## Vídeo (10/10/2026)
 
