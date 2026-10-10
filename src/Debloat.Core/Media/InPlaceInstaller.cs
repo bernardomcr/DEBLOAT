@@ -136,7 +136,7 @@ public static partial class InPlaceInstaller
     string sourceWim = Path.Combine(root, "sources", "boot.wim");
     string wim = Path.Combine(root, "debloat", "winpe.wim");
     string mount = Directory.CreateTempSubdirectory("debloat-winpe-").FullName;
-    await Dism($"/Export-Image /SourceImageFile:\"{sourceWim}\" /SourceIndex:1 /DestinationImageFile:\"{wim}\"", ct);
+    await Dism($"/Export-Image /SourceImageFile:\"{sourceWim}\" /SourceIndex:1 /DestinationImageFile:\"{wim}\" /Bootable", ct);   // sem /Bootable o boot pela memória falha (0xc0000487, VM 10/10/2026)
     await Dism($"/Mount-Wim /WimFile:\"{wim}\" /Index:1 /MountDir:\"{mount}\"", ct);
     bool commit = false;
     try
