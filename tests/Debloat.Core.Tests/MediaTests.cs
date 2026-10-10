@@ -183,3 +183,14 @@ public class InPlaceSafetyTests
     Assert.True(firstLogon.IndexOf("$setupPartition | Remove-Partition", StringComparison.Ordinal) > firstLogon.IndexOf("FIM da lista de apps", StringComparison.Ordinal));
   }
 }
+
+public class PowerShellErrorTests
+{
+  [Fact]
+  public void Erro_em_CLIXML_vira_a_mensagem()
+  {
+    const string clixml = "#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"><Obj S=\"progress\" RefId=\"0\"><TN RefId=\"0\"><T>X</T></TN></Obj>"
+      + "<S S=\"Error\">New-Partition : Not enough available capacity_x000D__x000A_</S><S S=\"Error\">No linha:7 caractere:14_x000D__x000A_</S><S S=\"Error\">+ $p = New-Partition_x000D__x000A_</S></Objs>";
+    Assert.Equal("New-Partition : Not enough available capacity", Debloat.Core.Media.PowerShell.ErrorText(clixml));
+  }
+}

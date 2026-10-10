@@ -65,9 +65,20 @@ public static partial class InPlaceInstaller
         if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max }
         $c = Get-Partition -DriveLetter $env:SystemDrive[0]
       }
-      $c | Resize-Partition -Size ($c.Size - {{plan.PartitionSize}})
-      $p = New-Partition -DiskNumber $c.DiskNumber -Size {{plan.PartitionSize}} -AssignDriveLetter
-      Format-Volume -Partition $p -FileSystem NTFS -NewFileSystemLabel '{{SetupLabel}}' -Confirm:$false | Out-Null
+      # 64 MB de folga: com o alinhamento do disco, o espaço livre sai um pouco menor que o encolhido.
+      $c | Resize-Partition -Size ($c.Size - {{plan.PartitionSize}} - 64MB)
+      $p = $null
+      try {
+        $p = New-Partition -DiskNumber $c.DiskNumber -Size {{plan.PartitionSize}} -AssignDriveLetter
+        Format-Volume -Partition $p -FileSystem NTFS -NewFileSystemLabel '{{SetupLabel}}' -Confirm:$false | Out-Null
+      } catch {
+        # Deu errado: devolve o espaço ao C: antes de avisar (o C: não pode ficar encolhido à toa).
+        if( $p ) { $p | Remove-Partition -Confirm:$false -ErrorAction SilentlyContinue }
+        $c = Get-Partition -DriveLetter $env:SystemDrive[0]
+        $max = ($c | Get-PartitionSupportedSize).SizeMax
+        if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max -ErrorAction SilentlyContinue }
+        throw
+      }
       (Get-Partition -DiskNumber $c.DiskNumber -PartitionNumber $p.PartitionNumber).DriveLetter
       """, ct)).Trim()[0];
     string root = $"{s}:\\";

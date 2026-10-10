@@ -26,9 +26,27 @@ internal static class PowerShell
     string output = await stdout, error = await stderr;
     if (process.ExitCode != 0)
     {
-      throw new InvalidOperationException(error.Trim().Split('\n').FirstOrDefault()?.Trim() ?? $"PowerShell saiu com {process.ExitCode}.");
+      throw new InvalidOperationException(ErrorText(error) is { Length: > 0 } text ? text : $"PowerShell saiu com {process.ExitCode}.");
     }
     return output;
+  }
+
+  /// <summary>
+  /// Mensagem de erro legível. Quando o PowerShell escreve progresso antes do erro, tudo vem em CLIXML
+  /// ("#&lt; CLIXML" + &lt;S S="Error"&gt;...); sem isto a mensagem era só "#&lt; CLIXML" (VM, 10/10/2026).
+  /// </summary>
+  internal static string ErrorText(string stderr)
+  {
+    string text = stderr.Trim();
+    if (text.StartsWith("#< CLIXML", StringComparison.Ordinal))
+    {
+      text = string.Concat(System.Text.RegularExpressions.Regex.Matches(text, "<S S=\"Error\">(.*?)</S>")
+        .Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value).Replace("_x000D_", "").Replace("_x000A_", "\n")));
+    }
+    // Só a mensagem: sem as linhas "No linha:..."/"At line:..." e o resto da posição no script.
+    var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+      .TakeWhile(l => !l.StartsWith("No linha", StringComparison.Ordinal) && !l.StartsWith("At line", StringComparison.Ordinal));
+    return string.Join(" ", lines).Trim();
   }
 
   /// <summary>Texto seguro dentro de aspas simples no PowerShell.</summary>
