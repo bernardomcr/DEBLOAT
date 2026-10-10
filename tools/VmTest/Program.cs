@@ -256,6 +256,14 @@ try
       new Progress<OfflineProgress>(p => { if (p.State != OfflineState.Downloading) Log($"  {p.Id}: {p.State} {p.Note}"); }));
     Log($"  {offline.Count} de {presetApps.Count} instaladores na mídia");
   }
+  // --painel-exe <DEBLOAT.exe publicado>: vai na mídia, como o app faz, para o primeiro login abrir o painel.
+  int panelAt = Array.IndexOf(args, "--painel-exe");
+  if (panelAt >= 0)
+  {
+    Directory.CreateDirectory(Path.Combine(media, "DEBLOAT"));
+    File.Copy(args[panelAt + 1], Path.Combine(media, "DEBLOAT", "DEBLOAT.exe"), overwrite: true);
+    Log("DEBLOAT.exe (painel) na mídia");
+  }
   foreach (var stale in Directory.EnumerateFiles(shots)) File.Delete(stale);
   Log("Gerando a ISO");
   IsoWriter.Write(media, iso);

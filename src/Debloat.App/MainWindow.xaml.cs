@@ -40,14 +40,7 @@ public partial class MainWindow : FluentWindow
     {
       Tabs.SelectedIndex = i;
       await Task.Delay(700);
-      var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
-      var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(ActualWidth * dpi.DpiScaleX), (int)(ActualHeight * dpi.DpiScaleY),
-        dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
-      bitmap.Render(this);
-      var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
-      png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-      using var file = System.IO.File.Create(System.IO.Path.Combine(folder, $"{i + 1}-{((System.Windows.Controls.TabItem)Tabs.Items[i]).Header}.png"));
-      png.Save(file);
+      Prints.Save(this, System.IO.Path.Combine(folder, $"{i + 1}-{((System.Windows.Controls.TabItem)Tabs.Items[i]).Header}.png"));
     }
     Close();
   }

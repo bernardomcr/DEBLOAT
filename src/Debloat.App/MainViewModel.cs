@@ -416,6 +416,13 @@ public partial class MainViewModel : ObservableObject
       await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
     }
 
+    // O próprio DEBLOAT vai na mídia: no primeiro login ele vira o painel dos apps (o FirstLogon.ps1 procura
+    // DEBLOAT\DEBLOAT.exe). Só a versão publicada (arquivo único); no desenvolvimento o .exe sozinho não roda.
+    if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "Debloat.Core.dll")) && Environment.ProcessPath is { } self)
+    {
+      Directory.CreateDirectory(Path.Combine(MediaDir, "DEBLOAT"));
+      File.Copy(self, Path.Combine(MediaDir, "DEBLOAT", "DEBLOAT.exe"), overwrite: true);
+    }
     Status = "Pondo os instaladores na mídia...";
     await Task.Run(() =>
     {
