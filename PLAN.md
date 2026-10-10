@@ -156,7 +156,7 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    PowerToys...).
 3. ✅ **Instaladores na mídia** (10/10/2026): enquanto o Windows baixa, `OfflineInstallers` baixa os
    instaladores (4 em paralelo; `winget download` com hash conferido + opções silenciosas do manifesto;
-   GitHub/URL direto; Wand pelo plano B com assinatura conferida no primeiro login) para `DEBLOATpps`
+   GitHub/URL direto; Wand pelo plano B com assinatura conferida no primeiro login) para `DEBLOAT\apps`
    na ISO/pendrive, com a janela "Preparando" listando cada um. O primeiro login copia para
    `C:\Debloat\instaladores`, instala de lá e só usa internet/winget para o que faltar ou falhar.
    Medido no preset: 48 de 53 na mídia, 3,3 GB, 1,3 min. Ficam pela internet: Loja (WhatsApp, ChatGPT —
