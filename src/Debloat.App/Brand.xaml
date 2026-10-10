@@ -1,0 +1,97 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Identidade DEBLOAT! (docs/marca). As cores (DebloatBackground, DebloatAccent...) vêm do Brand.cs, por tema. -->
+
+  <FontFamily x:Key="DebloatFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+
+  <Style x:Key="PageTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="LineHeight" Value="36" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,16" />
+    <Setter Property="Foreground" Value="{DynamicResource DebloatText}" />
+  </Style>
+
+  <Style x:Key="GroupTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="LineHeight" Value="26" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,10" />
+    <Setter Property="Foreground" Value="{DynamicResource DebloatText}" />
+  </Style>
+
+  <Style x:Key="Secondary" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource DebloatMuted}" />
+  </Style>
+
+  <Style x:Key="FieldLabel" TargetType="TextBlock">
+    <Setter Property="Margin" Value="0,0,0,4" />
+    <Setter Property="Foreground" Value="{DynamicResource DebloatMuted}" />
+  </Style>
+
+  <!-- Foco de teclado: 2 px na cor de destaque, 3 px de folga. -->
+  <Style x:Key="DebloatFocus">
+    <Setter Property="Control.Template">
+      <Setter.Value>
+        <ControlTemplate>
+          <Rectangle Margin="-3" RadiusX="6" RadiusY="6" StrokeThickness="2" Stroke="{DynamicResource DebloatAccent}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Abas: faixa de 44 px com divisória embaixo; aba ativa com indicador laranja de 3 px. -->
+  <Style x:Key="DebloatTabs" TargetType="TabControl">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabControl">
+          <Grid KeyboardNavigation.TabNavigation="Local">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border BorderBrush="{DynamicResource DebloatBorder}" BorderThickness="0,0,0,1" Padding="32,0">
+              <TabPanel IsItemsHost="True" KeyboardNavigation.TabIndex="1" />
+            </Border>
+            <ContentPresenter Grid.Row="1" ContentSource="SelectedContent" />
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="DebloatTab" TargetType="TabItem">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource DebloatFocus}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Grid Height="44" Margin="0,0,32,0" Background="Transparent">
+            <!-- Cópia invisível em semibold reserva a largura: a aba não pula quando fica ativa. -->
+            <TextBlock Text="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}" FontSize="14" FontWeight="SemiBold"
+                       Visibility="Hidden" VerticalAlignment="Center" />
+            <TextBlock x:Name="Label" Text="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}" FontSize="14"
+                       VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource DebloatMuted}" />
+            <Border x:Name="Indicator" Height="3" VerticalAlignment="Bottom" CornerRadius="1.5"
+                    Background="{DynamicResource DebloatOrange}" Visibility="Hidden" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource DebloatText}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource DebloatText}" />
+              <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+              <Setter TargetName="Indicator" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>

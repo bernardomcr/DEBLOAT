@@ -31,7 +31,7 @@ $form = New-Object System.Windows.Forms.Form
 $form.FormBorderStyle = 'None'
 $form.ShowInTaskbar = $false
 $form.TopMost = $true
-$form.BackColor = [System.Drawing.Color]::FromArgb( 32, 32, 32 )
+$form.BackColor = [System.Drawing.Color]::FromArgb( 32, 33, 36 )   # cores da marca DEBLOAT! (tema escuro)
 $form.AutoScaleMode = 'Dpi'
 $form.ClientSize = New-Object System.Drawing.Size( 380, 92 )
 $form.StartPosition = 'Manual'
@@ -44,15 +44,15 @@ $title.Font = New-Object System.Drawing.Font( 'Segoe UI Semibold', 11 )
 $title.Text = 'Preparando o Windows'
 $detail = New-Object System.Windows.Forms.Label
 $detail.SetBounds( 16, 38, 348, 20 )
-$detail.ForeColor = [System.Drawing.Color]::FromArgb( 190, 190, 190 )
+$detail.ForeColor = [System.Drawing.Color]::FromArgb( 180, 182, 188 )
 $detail.Font = New-Object System.Drawing.Font( 'Segoe UI', 9 )
 $detail.AutoEllipsis = $true
 $track = New-Object System.Windows.Forms.Panel
 $track.SetBounds( 16, 70, 348, 4 )
-$track.BackColor = [System.Drawing.Color]::FromArgb( 64, 64, 64 )
+$track.BackColor = [System.Drawing.Color]::FromArgb( 69, 71, 77 )
 $bar = New-Object System.Windows.Forms.Panel
 $bar.SetBounds( 0, 0, 0, 4 )
-$bar.BackColor = [System.Drawing.Color]::FromArgb( 76, 194, 255 )
+$bar.BackColor = [System.Drawing.Color]::FromArgb( 255, 137, 109 )
 $track.Controls.Add( $bar )
 $form.Controls.AddRange( @( $title, $detail, $track ) )
 # Aberto com janela oculta, o Windows esconderia o aviso também: mostra sem tirar o foco de quem estiver usando.

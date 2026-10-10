@@ -195,7 +195,7 @@ public partial class MainViewModel : ObservableObject
   /// <summary>Uma build escolhível: a pronta da Microsoft (Official) ou uma do UUP dump (Uup), que precisa ser convertida.</summary>
   public record BuildOption(Version Build, WindowsRelease? Official, UupBuild? Uup)
   {
-    public override string ToString() => Official is not null ? $"{Build} (pronta da Microsoft)" : $"{Build}";
+    public override string ToString() => Official is not null ? $"{Build} (Microsoft)" : $"{Build}";
   }
 
   public record VersionGroup(string Label, List<BuildOption> Builds)

@@ -20,9 +20,38 @@ public partial class MainWindow : FluentWindow
     };
     Loaded += async (_, _) =>
     {
+#if DEBUG
+      // Só no desenvolvimento: DEBLOAT_PRINTS=<pasta> salva uma imagem de cada aba e fecha (para conferir o visual).
+      if (Environment.GetEnvironmentVariable("DEBLOAT_PRINTS") is { Length: > 0 } prints)
+      {
+        _ = SavePrintsAsync(prints);
+      }
+#endif
       await Task.WhenAll(vm.LoadReleasesAsync(), vm.RefreshUsbCommand.ExecuteAsync(null), vm.LoadMigrationAsync());
     };
   }
+
+#if DEBUG
+  private async Task SavePrintsAsync(string folder)
+  {
+    System.IO.Directory.CreateDirectory(folder);
+    await Task.Delay(8000);   // versões do Windows e pendrives carregando
+    for (int i = 0; i < Tabs.Items.Count; i++)
+    {
+      Tabs.SelectedIndex = i;
+      await Task.Delay(700);
+      var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+      var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(ActualWidth * dpi.DpiScaleX), (int)(ActualHeight * dpi.DpiScaleY),
+        dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
+      bitmap.Render(this);
+      var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+      png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+      using var file = System.IO.File.Create(System.IO.Path.Combine(folder, $"{i + 1}-{((System.Windows.Controls.TabItem)Tabs.Items[i]).Header}.png"));
+      png.Save(file);
+    }
+    Close();
+  }
+#endif
 
   private async void WriteUsb_Click(object sender, RoutedEventArgs e)
   {

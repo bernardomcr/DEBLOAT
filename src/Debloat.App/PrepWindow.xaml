@@ -3,8 +3,9 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="Preparando" Width="520" Height="600" MinWidth="420" MinHeight="360"
-                 WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round">
+                 WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="Assets/DEBLOAT.ico"
+                 Background="{DynamicResource DebloatBackground}" FontFamily="{StaticResource DebloatFont}"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="None" WindowCornerPreference="Round">
   <ui:FluentWindow.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
   </ui:FluentWindow.Resources>
@@ -17,7 +18,7 @@
 
     <ui:TitleBar Grid.Row="0" Title="Preparando" ShowMinimize="False" ShowMaximize="False" />
 
-    <ScrollViewer Grid.Row="1" Padding="16,8">
+    <ScrollViewer Grid.Row="1" Padding="24,12">
       <ItemsControl ItemsSource="{Binding PrepItems}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -27,21 +28,21 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <ui:SymbolIcon Symbol="CheckmarkCircle24" Filled="True" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+              <ui:SymbolIcon Symbol="CheckmarkCircle24" Filled="True" Foreground="{DynamicResource DebloatAccent}"
                              Visibility="{Binding Done, Converter={StaticResource BoolToVisibility}}" />
               <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
-                         Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                         Foreground="{DynamicResource DebloatText}" />
               <TextBlock Grid.Column="2" Text="{Binding State}" Margin="12,0,0,0"
-                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                         Foreground="{DynamicResource DebloatMuted}" />
             </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
 
-    <StackPanel Grid.Row="2" Margin="16,8,16,16">
+    <StackPanel Grid.Row="2" Margin="24,8,24,20">
       <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Height="4" Margin="0,0,0,8" />
-      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource DebloatMuted}" Margin="0,0,0,8" />
       <ui:Button Content="Fechar" HorizontalAlignment="Right" Click="Close_Click" />
     </StackPanel>
   </Grid>
