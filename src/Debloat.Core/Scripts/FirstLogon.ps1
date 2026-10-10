@@ -360,11 +360,18 @@ function Get-File([string] $Url, [string] $Path) {
 
 function Install-Downloaded([string] $File, [string] $Arguments) {
 	if( $File -like '*.msi' ) {
-		$p = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -Wait -PassThru
+		$p = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -PassThru
 	} elseif( $Arguments ) {
-		$p = Start-Process -FilePath $File -ArgumentList $Arguments -Wait -PassThru
+		$p = Start-Process -FilePath $File -ArgumentList $Arguments -PassThru
 	} else {
-		$p = Start-Process -FilePath $File -Wait -PassThru
+		$p = Start-Process -FilePath $File -PassThru
+	}
+	$null = $p.Handle   # sem guardar o handle agora, o PowerShell 5.1 perde o código de saída
+	# Limite de 10 min: um instalador parado numa janela (esperando um clique) não pode segurar a lista inteira.
+	if( -not $p.WaitForExit( 600000 ) ) {
+		& taskkill.exe /PID $p.Id /T /F | Out-Null
+		Write-Log 'apps.log' "  instalador parado há 10 min: encerrado"
+		return -1
 	}
 	Write-Log 'apps.log' "  instalador saiu com $($p.ExitCode)"
 	Remove-Item -LiteralPath $File -ErrorAction SilentlyContinue
@@ -547,7 +554,7 @@ function Start-Parallel {
 				$p = Start-Process -FilePath $file -PassThru
 			}
 			$null = $p.Handle   # sem guardar o handle agora, o PowerShell 5.1 perde o código de saída
-			$script:running += [pscustomobject]@{ App = $app; Item = $item; Process = $p; File = $file }
+			$script:running += [pscustomobject]@{ App = $app; Item = $item; Process = $p; File = $file; Started = Get-Date }
 		} catch {
 			Write-Log 'apps.log' "  $($app.name): ERRO $_; tenta de novo na fila normal"
 			[void] $script:retry.Add( $app )
@@ -557,6 +564,12 @@ function Start-Parallel {
 }
 
 function Receive-Parallel {
+	foreach( $job in @( $script:running | Where-Object { -not $_.Process.HasExited -and ((Get-Date) - $_.Started).TotalMinutes -gt 10 } ) ) {
+		& taskkill.exe /PID $job.Process.Id /T /F | Out-Null
+		Write-Log 'apps.log' "  $($job.App.name): instalador parado há 10 min: encerrado"
+		$script:running = @( $script:running | Where-Object { $_ -ne $job } )
+		$script:done++
+	}
 	foreach( $job in @( $script:running | Where-Object { $_.Process.HasExited } ) ) {
 		$script:running = @( $script:running | Where-Object { $_ -ne $job } )
 		$code = $job.Process.ExitCode
@@ -572,9 +585,13 @@ function Receive-Parallel {
 }
 
 $serial = @()
+# Quem depende de outro app, e quem é dependência (Everything Toolbar precisa do Everything), fica na fila normal,
+# na ordem do catálogo: em paralelo o Toolbar rodou antes do Everything terminar e parou numa janela (VM, 10/10/2026).
+$dependencies = @( $apps | ForEach-Object { $_.requires } | Where-Object { $_ } )
 foreach( $app in $apps ) {
 	$item = $offline[$app.id]
-	if( $item -and $item.parallel -and -not $item.signer ) { $parallelQueue.Enqueue( $app ) } else { $serial += $app }
+	$linked = $app.requires -or ($app.id -in $dependencies)
+	if( $item -and $item.parallel -and -not $item.signer -and -not $linked ) { $parallelQueue.Enqueue( $app ) } else { $serial += $app }
 }
 
 if( $apps.Count -gt 0 ) {

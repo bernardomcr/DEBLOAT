@@ -61,6 +61,6 @@ public sealed class AppCatalog
 
   /// <summary>JSON enxuto que o FirstLogon.ps1 lê.</summary>
   public static string ToScriptJson(IEnumerable<AppEntry> apps) => JsonSerializer.Serialize(
-    apps.Select(a => new { a.Id, a.Name, a.Source, a.Package, a.Architecture, a.Args, a.Asset, a.FallbackUrl, a.Signer }),
+    apps.Select(a => new { a.Id, a.Name, a.Source, a.Package, a.Architecture, a.Args, a.Asset, a.FallbackUrl, a.Signer, a.Requires }),
     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true });
 }
