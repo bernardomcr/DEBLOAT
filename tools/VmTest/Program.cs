@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Management;
 using System.Runtime.InteropServices;
+using Debloat.Core.Catalog;
 using Debloat.Core.Media;
 using Debloat.Core.Presets;
 
@@ -185,6 +186,15 @@ try
   {
     Log("Montando a mídia (preset padrão + apagar disco 0)");
     await MediaBuilder.BuildAsync(esd, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+  }
+  Log("Baixando os instaladores dos apps para a mídia");
+  var appCatalog = AppCatalog.Load();
+  var presetApps = appCatalog.Resolve(appCatalog.Defaults.Select(a => a.Id));
+  using (var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
+  {
+    var offline = await OfflineInstallers.PrepareAsync(http, presetApps, Path.Combine(root, "..", "cache", "apps"), media,
+      new Progress<OfflineProgress>(p => { if (p.State != OfflineState.Downloading) Log($"  {p.Id}: {p.State} {p.Note}"); }));
+    Log($"  {offline.Count} de {presetApps.Count} instaladores na mídia");
   }
   foreach (var stale in Directory.EnumerateFiles(shots)) File.Delete(stale);
   Log("Gerando a ISO");

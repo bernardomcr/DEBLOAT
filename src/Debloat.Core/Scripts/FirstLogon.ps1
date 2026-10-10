@@ -409,9 +409,19 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 	}
 }
 
+# Recursos do Windows (.NET 3.5) são ativados pelo sistema e levam ~5 min: rodam em paralelo com a lista.
+$featureJobs = @( $apps | Where-Object source -eq 'feature' | ForEach-Object {
+	Write-Log 'apps.log' "Instalando $($_.name) em paralelo..."
+	Start-Job -Name $_.name -ArgumentList ${function:Enable-FromMedia}.ToString(), $_.package -ScriptBlock {
+		param( [string] $Body, [string] $Feature )
+		& ([scriptblock]::Create( $Body )) $Feature
+	}
+} )
+
 if( $apps.Count -gt 0 ) {
 	$index = 0
 	foreach( $app in $apps ) {
+		if( $app.source -eq 'feature' ) { $index++; continue }
 		Close-NewWindows   # o que o app anterior abriu
 		$index++
 		Set-Notice "Instalando apps: $index de $($apps.Count)" $app.name ([int] (100 * ($index - 1) / $apps.Count))
@@ -427,10 +437,6 @@ if( $apps.Count -gt 0 ) {
 		Initialize-Online
 		try {
 			switch( $app.source ) {
-				'feature' {
-					Enable-FromMedia $app.package
-					Write-Log 'apps.log' "  recurso do Windows ativado"
-				}
 				'winget' {
 					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
 					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
@@ -474,6 +480,16 @@ if( $apps.Count -gt 0 ) {
 	}
 }
 
+foreach( $job in $featureJobs ) {
+	Set-Notice 'Finalizando' $job.Name 100
+	Wait-Job -Job $job | Out-Null
+	if( $job.State -eq 'Completed' ) {
+		Write-Log 'apps.log' "$($job.Name): recurso do Windows ativado"
+	} else {
+		Write-Log 'apps.log' "$($job.Name): ERRO $($job.ChildJobs[0].JobStateInfo.Reason)"
+	}
+	Remove-Job -Job $job -Force
+}
 Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
 if( $apps.Count -gt 0 ) {
 	# Alguns abrem a janela só depois de se atualizarem (o Discord leva uns segundos).
