@@ -141,7 +141,7 @@ public static partial class UupDump
       return folder;
     }
     await File.WriteAllTextAsync(marker, "", ct);
-    progress?.Report(new("A build veio sem as atualizações (o Windows Update completa depois da instalação)", 1));
+    progress?.Report(new("A build veio incompleta (sem atualizações e sem os apps da Microsoft): prefira a versão pronta da Microsoft", 1));
     return folder;
   }
 

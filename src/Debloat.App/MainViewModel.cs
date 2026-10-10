@@ -357,7 +357,7 @@ public partial class MainViewModel : ObservableObject
         new Progress<MediaStep>(s => { ProgressValue = s.Fraction * 100; Status = s.Text + "..."; }));
       esdPath = null;
       Status = File.Exists(Path.Combine(work, UupDump.MissingUpdatesFile))
-        ? "Windows montado, sem as atualizações da build (o Windows Update completa depois da instalação)."
+        ? "A build veio incompleta (sem as atualizações e sem os apps da Microsoft, porque o DISM deste PC falhou). Prefira a versão pronta da Microsoft."
         : "Windows montado.";
       return;
     }

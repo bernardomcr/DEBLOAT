@@ -110,6 +110,13 @@ public partial class PanelViewModel : ObservableObject
         row.State = state;
       }
       Runtimes = runtimesTotal == 0 ? "" : $"{runtimesDone} de {runtimesTotal}";
+      if (Finished)
+      {
+        // No fim o título do script é interno ("FIM"/"Pronto"): mostra a contagem.
+        int total = root.GetProperty("apps").GetArrayLength();
+        int ready = root.GetProperty("apps").EnumerateArray().Count(a => a.GetProperty("estado").GetString() == "pronto");
+        Title = $"{ready} de {total} apps instalados";
+      }
     }
     catch (Exception e) when (e is IOException or JsonException or KeyNotFoundException or InvalidOperationException)
     {

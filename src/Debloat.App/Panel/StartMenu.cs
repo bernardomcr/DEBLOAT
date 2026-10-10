@@ -57,6 +57,10 @@ public static class StartMenu
     var prefix = entries.Where(e => Normalize(e.Name).StartsWith(target, StringComparison.Ordinal) || target.StartsWith(Normalize(e.Name), StringComparison.Ordinal) && Normalize(e.Name).Length >= 4)
       .OrderBy(e => e.Name.Length).FirstOrDefault();
     if (prefix is not null) return prefix;
+    // "Mozilla Firefox" no catálogo, "Firefox" no Iniciar: o nome do Iniciar no fim do nome do catálogo.
+    var suffix = entries.Where(e => Normalize(e.Name).Length >= 5 && target.EndsWith(Normalize(e.Name), StringComparison.Ordinal))
+      .OrderByDescending(e => e.Name.Length).FirstOrDefault();
+    if (suffix is not null) return suffix;
     string first = FirstWord(appName);
     if (first.Length < 4) return null;
     var byWord = entries.Where(e => FirstWord(e.Name) == first).ToList();
