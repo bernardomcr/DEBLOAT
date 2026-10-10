@@ -5,13 +5,16 @@ using System.Text.Json.Nodes;
 
 namespace Debloat.Core.Saves;
 
-public enum MigrationKind { Wifi, ShareX, Firefox, Chromium, Folder }
+public enum MigrationKind { Wifi, ShareX, Firefox, Chromium, Folder, Program }
 
 /// <summary>Uma coisa que dá para levar para o Windows novo. Path é a pasta de origem (vazio para Wi-Fi).</summary>
 public record MigrationItem(string Id, MigrationKind Kind, string Name, string Path, long Bytes, string Note, bool DefaultSelected)
 {
   public IReadOnlyList<string> ExcludeDirs { get; init; } = [];
   public IReadOnlyList<string> RunningProcesses { get; init; } = [];
+
+  /// <summary>Programa levado pela pasta: o .exe ganha um atalho no Iniciar do Windows novo.</summary>
+  public string? Shortcut { get; init; }
 }
 
 /// <summary>
@@ -110,6 +113,7 @@ public static class Migration
         ["name"] = item.Name,
         ["original"] = item.Kind == MigrationKind.Wifi ? "" : SaveScanner.TokenizePath(item.Path),
         ["stored"] = stored,
+        ["exe"] = item.Shortcut is null ? null : SaveScanner.TokenizePath(item.Shortcut),
       });
     }
     await File.WriteAllTextAsync(System.IO.Path.Combine(root, "manifest.json"), manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), ct);

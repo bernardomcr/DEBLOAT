@@ -21,7 +21,7 @@ public sealed class UnattendBuilder
 
   public XmlDocument Build(DebloatOptions options)
   {
-    var apps = catalog.Resolve(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id));
+    var apps = catalog.ResolveWithExtras(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id), options.ExtraApps);
     bool Has(string tweak) => options.Has(tweak);
     bool vlc = apps.Any(a => a.Id == "vlc");
     bool everythingToolbar = apps.Any(a => a.Id == "everything-toolbar");

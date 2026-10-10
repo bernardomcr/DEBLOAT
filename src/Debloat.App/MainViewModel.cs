@@ -80,6 +80,17 @@ public partial class TweakGroup(string name, IEnumerable<TweakRow> rows) : Obser
 
 public record DnsOption(DnsChoice Value, string Label);
 
+/// <summary>Programa deste PC (aba Backup): pelo winget no Windows novo, ou levando a pasta.</summary>
+public partial class ProgramRow(InstalledProgram program) : ObservableObject
+{
+  public InstalledProgram Program { get; } = program;
+
+  public string Detail => Program.WingetId is not null ? "Instala pelo winget" : $"Leva a pasta · {MainViewModel.Size(Program.Bytes)}";
+
+  [ObservableProperty]
+  private bool isSelected;
+}
+
 public partial class MigrationRow(MigrationItem item, bool selected) : ObservableObject
 {
   public MigrationItem Item { get; } = item;
@@ -307,6 +318,7 @@ public partial class MainViewModel : ObservableObject
       RemovedApps = rows.Where(x => x.Group == RemovedAppsGroup && x.Row.IsSelected).Select(x => x.Row.Id).ToHashSet(),
       Dns = SelectedDns.Value,
       SelectedApps = Categories.SelectMany(c => c.Apps).Where(a => a.IsSelected).Select(a => a.Entry.Id).ToList(),
+      ExtraApps = Programs.Where(p => p.IsSelected && p.Program.WingetId is not null).Select(p => new ExtraApp(p.Program.WingetId!, p.Program.Name)).ToList(),
     };
   }
 
@@ -377,7 +389,7 @@ public partial class MainViewModel : ObservableObject
   private async Task PrepareMediaAsync(double share)
   {
     var options = BuildOptions();
-    var apps = catalog.Resolve(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id));
+    var apps = catalog.ResolveWithExtras(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id), options.ExtraApps);
     PrepItems.Clear();
     var windows = new PrepItem("windows", SelectedBuild is { } b ? $"Windows 11 {SelectedVersion?.Label} ({b.Build})" : "Windows 11");
     PrepItems.Add(windows);
@@ -537,7 +549,30 @@ public partial class MainViewModel : ObservableObject
 
   /// <summary>Quanto vai para a partição de dados (saves + migração).</summary>
   private long BackupBytes =>
-    Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes) + Migration.Where(m => m.IsSelected).Sum(m => m.Item.Bytes);
+    Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes) + SelectedMigration().Sum(m => m.Bytes);
+
+  // --- Programas deste PC ---
+
+  public ObservableCollection<ProgramRow> Programs { get; } = [];
+
+  [RelayCommand]
+  private async Task ScanPrograms() => await RunBusy(async () =>
+  {
+    Status = "Procurando os programas instalados...";
+    var found = await InstalledPrograms.DetectAsync(catalog.Apps.ToList());
+    Programs.Clear();
+    foreach (var program in found) Programs.Add(new ProgramRow(program));
+    Status = $"{found.Count} programas que não estão na aba Apps.";
+  });
+
+  /// <summary>Pastas e programas marcados que vão no backup (os programas sem winget vão pela pasta, com atalho).</summary>
+  private List<MigrationItem> SelectedMigration() =>
+  [
+    .. Migration.Where(m => m.IsSelected).Select(m => m.Item),
+    .. Programs.Where(p => p.IsSelected && p.Program.WingetId is null && p.Program.Folder is not null).Select(p =>
+      new MigrationItem("programa-" + string.Concat(p.Program.Name.Where(char.IsLetterOrDigit)), MigrationKind.Program, p.Program.Name,
+        p.Program.Folder!, p.Program.Bytes, "", true) { Shortcut = p.Program.Exe }),
+  ];
 
   // --- Pendrive ---
 
@@ -575,7 +610,7 @@ public partial class MainViewModel : ObservableObject
       return;
     }
     var saves = Saves.Where(s => s.IsSelected).Select(s => s.Game).ToList();
-    var migration = Migration.Where(m => m.IsSelected).Select(m => m.Item).ToList();
+    var migration = SelectedMigration();
     var open = Debloat.Core.Saves.Migration.OpenPrograms(migration);
     if (open.Count > 0)
     {
@@ -606,7 +641,7 @@ public partial class MainViewModel : ObservableObject
       Status = "Abra o DEBLOAT como administrador.";
       return;
     }
-    var migration = Migration.Where(m => m.IsSelected).Select(m => m.Item).ToList();
+    var migration = SelectedMigration();
     var open = Debloat.Core.Saves.Migration.OpenPrograms(migration);
     if (open.Count > 0)
     {

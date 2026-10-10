@@ -266,6 +266,15 @@ if( $dados ) {
 			} else {
 				$target = [Environment]::ExpandEnvironmentVariables( $item.original )
 				robocopy.exe $source $target /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+				if( $item.kind -eq 'Program' -and $item.exe ) {
+					# Programa levado pela pasta: atalho no Iniciar para todos os usuários.
+					$exe = [Environment]::ExpandEnvironmentVariables( $item.exe )
+					$file = $item.name -replace '[\\/:*?"<>|]', ''
+					$link = (New-Object -ComObject WScript.Shell).CreateShortcut( "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\$file.lnk" )
+					$link.TargetPath = $exe
+					$link.WorkingDirectory = Split-Path $exe
+					$link.Save()
+				}
 			}
 			Write-Log 'migracao.log' "Restaurado: $($item.name)"
 		}

@@ -5,6 +5,12 @@ namespace Debloat.Core.Catalog;
 
 public record AppCategory(string Id, string Name);
 
+/// <summary>Programa fora do catálogo, pelo ID do winget (detectado no PC atual).</summary>
+public record ExtraApp(string WingetId, string Name)
+{
+  public AppEntry ToEntry() => new("x-" + WingetId, Name, "extras", "winget", WingetId, false);
+}
+
 public record AppEntry(
   string Id,
   string Name,
@@ -44,6 +50,14 @@ public sealed class AppCatalog
   public IEnumerable<AppEntry> Defaults => Apps.Where(a => a.Default);
 
   /// <summary>Expande dependências (ex.: Everything Toolbar puxa o Everything) mantendo a ordem do catálogo.</summary>
+  /// <summary>Apps escolhidos (com dependências) + os programas extras do PC atual, sem repetir pacote.</summary>
+  public IReadOnlyList<AppEntry> ResolveWithExtras(IEnumerable<string> selectedIds, IEnumerable<ExtraApp> extras)
+  {
+    var apps = Resolve(selectedIds).ToList();
+    apps.AddRange(extras.Where(x => !apps.Any(a => a.Package.Equals(x.WingetId, StringComparison.OrdinalIgnoreCase))).Select(x => x.ToEntry()));
+    return apps;
+  }
+
   public IReadOnlyList<AppEntry> Resolve(IEnumerable<string> selectedIds)
   {
     var wanted = new HashSet<string>(selectedIds);

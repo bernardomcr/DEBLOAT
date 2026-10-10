@@ -29,6 +29,9 @@ public record DebloatOptions
   public DnsChoice Dns { get; init; } = DnsChoice.Cloudflare;
   public IReadOnlyList<string>? SelectedApps { get; init; }   // null = padrões do catálogo
 
+  /// <summary>Programas deste PC que o winget conhece (aba Backup): instalados no Windows novo como os do catálogo.</summary>
+  public IReadOnlyList<Catalog.ExtraApp> ExtraApps { get; init; } = [];
+
   public IReadOnlySet<string> EffectiveTweaks => Tweaks ?? TweakCatalog.DefaultsFor(Hardware);
 
   public bool Has(string tweak) => EffectiveTweaks.Contains(tweak);

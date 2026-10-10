@@ -202,6 +202,27 @@
               </ItemsControl>
             </ui:CardExpander>
 
+            <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Apps24}" IsExpanded="True">
+              <ui:CardExpander.Header>
+                <DockPanel>
+                  <ui:Button DockPanel.Dock="Right" Content="Procurar programas" Command="{Binding ScanProgramsCommand}" Margin="0,0,12,0" />
+                  <TextBlock Text="Programas deste PC" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+              </ui:CardExpander.Header>
+              <ItemsControl ItemsSource="{Binding Programs}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Program.Name}" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ui:CardExpander>
+
             <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Folder24}" IsExpanded="True">
               <ui:CardExpander.Header>
                 <DockPanel>

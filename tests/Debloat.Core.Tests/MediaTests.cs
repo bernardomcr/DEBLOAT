@@ -194,3 +194,18 @@ public class PowerShellErrorTests
     Assert.Equal("New-Partition : Not enough available capacity", Debloat.Core.Media.PowerShell.ErrorText(clixml));
   }
 }
+
+public class InstalledProgramsTests
+{
+  [Fact]
+  public void Le_a_tabela_do_winget_com_CRLF_e_progresso()
+  {
+    string output = "   -\r   \\r   |\r"
+      + "Name                       Id                         Version     Available\r\n"
+      + "-------------------------------------------------------------------------\r\n"
+      + "AB Download Manager        amir1376.ABDownloadManager 1.8.7       1.10.4\r\n"
+      + "PostgreSQL 17              PostgreSQL.PostgreSQL.17   17.6\r\n";
+    var rows = Debloat.Core.Saves.InstalledPrograms.ParseList(output);
+    Assert.Equal([("AB Download Manager", "amir1376.ABDownloadManager"), ("PostgreSQL 17", "PostgreSQL.PostgreSQL.17")], rows);
+  }
+}
