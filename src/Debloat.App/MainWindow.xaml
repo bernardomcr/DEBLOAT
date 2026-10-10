@@ -227,7 +227,7 @@
               <ui:CardExpander.Header>
                 <DockPanel>
                   <ui:Button DockPanel.Dock="Right" Content="Adicionar pasta" Icon="{ui:SymbolIcon FolderAdd24}" Command="{Binding AddFolderCommand}" Margin="0,0,12,0" />
-                  <TextBlock Text="Programas e pastas" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Text="Configurações e pastas" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </DockPanel>
               </ui:CardExpander.Header>
               <ItemsControl ItemsSource="{Binding Migration}">
@@ -252,15 +252,17 @@
         <ScrollViewer Padding="32,24,32,32">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource PageTitle}" Text="Criar instalação" />
-            <TextBlock Style="{StaticResource FieldLabel}" Text="Pendrive" />
+            <TextBlock Style="{StaticResource GroupTitle}" Text="Este PC" />
+            <ui:Button Content="Reinstalar sem pendrive" Appearance="Primary" Icon="{ui:SymbolIcon ArrowSync24}" Click="InPlace_Click" Margin="0,0,0,28" />
+
+            <TextBlock Style="{StaticResource GroupTitle}" Text="Pendrive ou ISO" />
             <DockPanel Margin="0,0,0,12">
               <ui:Button DockPanel.Dock="Right" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RefreshUsbCommand}" Margin="8,0,0,0" ToolTip="Procurar pendrives" />
               <ComboBox ItemsSource="{Binding UsbDrives}" SelectedItem="{Binding SelectedUsb}" DisplayMemberPath="Label" />
             </DockPanel>
             <WrapPanel>
-              <ui:Button Content="Gravar pendrive" Appearance="Primary" Icon="{ui:SymbolIcon UsbStick24}" Click="WriteUsb_Click" Margin="0,0,8,8" />
+              <ui:Button Content="Gravar pendrive" Icon="{ui:SymbolIcon UsbStick24}" Click="WriteUsb_Click" Margin="0,0,8,8" />
               <ui:Button Content="Gerar ISO" Icon="{ui:SymbolIcon Album24}" Command="{Binding BuildIsoCommand}" Margin="0,0,8,8" />
-              <ui:Button Content="Reinstalar sem pendrive" Icon="{ui:SymbolIcon ArrowSync24}" Click="InPlace_Click" Margin="0,0,8,8" />
               <ui:Button Content="Só montar a pasta" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
               <ui:Button Content="Só o autounattend.xml" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,8" />
             </WrapPanel>
