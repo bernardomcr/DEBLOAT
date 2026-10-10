@@ -148,6 +148,9 @@ public partial class MainViewModel : ObservableObject
     "Sem Widgets, sem Bing na busca, sem Copilot, sem IA no Paint e no Bloco de Notas",
     "Xbox Game Bar desligada; Modo de Jogo e GPU por hardware ligados",
     "SmartScreen mantido; Smart App Control desligado; sem criptografia automática do disco",
+    "Sem PowerShell 2.0, WordPad e modo IE; Reprodução Automática desligada; OneDrive bloqueado",
+    "Explorador abre em Este Computador, sem Início e Galeria; Configurações, Explorador e Downloads no Iniciar",
+    "No desktop: Num Lock ligado e o PC nunca suspende sozinho",
     "Ponto de restauração no final de tudo",
   ];
 

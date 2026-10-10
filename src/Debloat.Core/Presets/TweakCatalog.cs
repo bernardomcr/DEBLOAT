@@ -103,7 +103,7 @@ public static class TweakCatalog
     new("sem-apps-segundo-plano", "Privacidade", "Bloquear apps da Loja em segundo plano", "WhatsApp e alarmes param de notificar com o app fechado", false, aggressive: true),
 
     // Mais propaganda
-    new("bloquear-onedrive", "Propaganda e sugestões", "Impedir o OneDrive mesmo se reinstalado", "", false),
+    new("bloquear-onedrive", "Propaganda e sugestões", "Impedir o OneDrive mesmo se reinstalado", "", true),
     new("sem-spotlight", "Propaganda e sugestões", "Sem Windows Spotlight (fotos e dicas na tela de bloqueio)", "", false),
 
     // Mais Windows Update
@@ -112,7 +112,7 @@ public static class TweakCatalog
     new("update-avisar", "Windows Update", "Só avisar antes de baixar atualizações", "Na prática muita gente nunca atualiza", false, aggressive: true),
 
     // Mais segurança
-    new("sem-autoplay", "Segurança", "Desligar Reprodução Automática (pendrive, CD)", "Evita vírus que se executam ao conectar um pendrive", false),
+    new("sem-autoplay", "Segurança", "Desligar Reprodução Automática (pendrive, CD)", "Evita vírus que se executam ao conectar um pendrive", true),
     new("ignorar-requisitos", "Segurança", "Instalar mesmo sem TPM 2.0 / CPU suportada", "", true),
     new("sem-login-apos-reinicio", "Segurança", "Não entrar sozinho na conta depois de um reinício do Update", "", false),
     new("acl-endurecida", "Segurança", "Endurecer permissões da unidade C:", "Usuários comuns não criam pastas na raiz do C:", false),
@@ -121,7 +121,7 @@ public static class TweakCatalog
     // Mais Explorador
     new("mostrar-arquivos-sistema", "Explorador de Arquivos", "Mostrar também os arquivos protegidos do sistema", "Fácil apagar algo importante por engano", false, aggressive: true),
     new("sem-docs-recentes", "Explorador de Arquivos", "Não guardar documentos recentes", "Somem os Recentes e as listas de atalhos dos programas", false),
-    new("sem-inicio-galeria", "Explorador de Arquivos", "Tirar \"Início\" e \"Galeria\" do painel lateral", "", false),
+    new("sem-inicio-galeria", "Explorador de Arquivos", "Tirar \"Início\" e \"Galeria\" do painel lateral", "", true),
     new("caminho-titulo", "Explorador de Arquivos", "Caminho completo na barra de título", "", false),
     new("sem-dicas-mouse", "Explorador de Arquivos", "Sem balões de descrição ao passar o mouse", "", false),
     new("sem-junctions", "Explorador de Arquivos", "Apagar atalhos ocultos antigos (\"Documents and Settings\" etc.)", "", false),
@@ -141,9 +141,9 @@ public static class TweakCatalog
     new("icone-rede", "Área de trabalho", "Ícone Rede", "", false),
 
     // Pastas no Iniciar (ao lado do botão de desligar)
-    new("pasta-Settings", "Pastas no Iniciar", "Configurações", "", false),
-    new("pasta-FileExplorer", "Pastas no Iniciar", "Explorador de Arquivos", "", false),
-    new("pasta-Downloads", "Pastas no Iniciar", "Downloads", "", false),
+    new("pasta-Settings", "Pastas no Iniciar", "Configurações", "", true),
+    new("pasta-FileExplorer", "Pastas no Iniciar", "Explorador de Arquivos", "", true),
+    new("pasta-Downloads", "Pastas no Iniciar", "Downloads", "", true),
     new("pasta-Documents", "Pastas no Iniciar", "Documentos", "", false),
     new("pasta-Pictures", "Pastas no Iniciar", "Imagens", "", false),
     new("pasta-Music", "Pastas no Iniciar", "Músicas", "", false),
@@ -152,13 +152,13 @@ public static class TweakCatalog
     new("pasta-PersonalFolder", "Pastas no Iniciar", "Pasta pessoal", "", false),
 
     // Teclado
-    new("num-lock", "Teclado", "Num Lock ligado ao iniciar", "", false),
+    new("num-lock", "Teclado", "Num Lock ligado ao iniciar", "", hw => !hw.HasBattery),
     new("sem-caps-lock", "Teclado", "Desativar a tecla Caps Lock", "", false),
 
     // Mais sistema
     new("sem-animacoes", "Sistema", "Sem animações de janela e menus", "Fica mais ágil e mantém fontes suaves e miniaturas", false),
-    new("desktop-sem-suspensao", "Sistema", "Nunca suspender sozinho", "A tela ainda desliga; bom para downloads e servidores de jogos", false),
-    new("sem-nomes-8dot3", "Sistema", "Sem nomes curtos 8.3 no NTFS", "Pastas com muitos arquivos ficam mais rápidas", false),
+    new("desktop-sem-suspensao", "Sistema", "Nunca suspender sozinho", "A tela ainda desliga; bom para downloads e servidores de jogos", hw => !hw.HasBattery),
+    new("sem-nomes-8dot3", "Sistema", "Sem nomes curtos 8.3 no NTFS", "Pastas com muitos arquivos ficam mais rápidas", true),
     new("sem-compatibilidade", "Sistema", "Desligar mecanismo de compatibilidade e SwitchBack", "Programas e jogos antigos podem parar de abrir", false, aggressive: true),
     new("sem-restauracao", "Sistema", "Desligar Proteção do Sistema (pontos de restauração)", "Sem como voltar o Windows sem formatar", false, aggressive: true),
 
@@ -197,8 +197,8 @@ public static class TweakCatalog
     ("RemoveVoiceRecorder", "Gravador de Som", _ => false), ("RemoveCamera", "Câmera", _ => false), ("RemoveClock", "Relógio", _ => false),
     ("RemoveCalculator", "Calculadora", _ => false), ("RemoveSnippingTool", "Ferramenta de Captura", _ => false), ("RemovePaint", "Paint", _ => false),
     ("RemoveWindowsTerminal", "Terminal", _ => false), ("RemoveStore", "Microsoft Store (quebra WhatsApp e ChatGPT)", _ => false),
-    ("RemoveInternetExplorer", "Modo Internet Explorer", _ => false), ("RemoveWordPad", "WordPad", _ => false),
-    ("RemovePowerShell2", "PowerShell 2.0 (antigo)", _ => false), ("RemoveGameAssist", "Assistente de jogos do Edge", _ => false),
+    ("RemoveInternetExplorer", "Modo Internet Explorer", _ => true), ("RemoveWordPad", "WordPad", _ => true),
+    ("RemovePowerShell2", "PowerShell 2.0 (antigo)", _ => true), ("RemoveGameAssist", "Assistente de jogos do Edge", _ => true),
     ("RemovePowerShellISE", "PowerShell ISE", _ => false), ("RemoveOpenSSHClient", "Cliente OpenSSH", _ => false),
     ("RemoveWindowsMediaPlayer", "Windows Media Player clássico", _ => false), ("RemoveNotepadClassic", "Bloco de Notas clássico", _ => false),
     ("RemoveMediaFeatures", "Recursos de mídia (quebra apps de vídeo)", _ => false),
