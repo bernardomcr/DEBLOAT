@@ -239,6 +239,7 @@
             <WrapPanel>
               <ui:Button Content="Gravar pendrive" Appearance="Primary" Icon="{ui:SymbolIcon UsbStick24}" Click="WriteUsb_Click" Margin="0,0,8,8" />
               <ui:Button Content="Gerar ISO" Icon="{ui:SymbolIcon Album24}" Command="{Binding BuildIsoCommand}" Margin="0,0,8,8" />
+              <ui:Button Content="Reinstalar sem pendrive" Icon="{ui:SymbolIcon ArrowSync24}" Click="InPlace_Click" Margin="0,0,8,8" />
               <ui:Button Content="Só montar a pasta" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
               <ui:Button Content="Só o autounattend.xml" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,8" />
             </WrapPanel>

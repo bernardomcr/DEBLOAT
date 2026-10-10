@@ -148,6 +148,19 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
    ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
+## Modo sem pendrive — testado na VM (10/10/2026)
+
+Funcionou de ponta a ponta: preparação (partição DEBLOAT-SETUP, cópia, WinPE, boot de uso único) → reinício
+normal → WinPE conferiu tudo, formatou só o C:, aplicou o Windows (1,5 min), refez o boot → instalação sem
+perguntas → primeiro login com os 48 instaladores vindos da partição (lista em 7 min) → partição apagada e C:
+de volta ao tamanho original (84,5 GB), menu de boot com uma entrada só, marcador removido.
+Problemas achados e corrigidos no caminho: partição maior que o espaço encolhido (folga de 64 MB); C: ficava
+encolhido após falha (desfaz tudo); "{guid}" quebrado pelo PowerShell (bcdedit direto); sobras de tentativa
+anterior (limpas antes de medir o espaço); WinPE sem /Bootable (0xc0000487); erro do PowerShell ilegível
+(CLIXML). O teste usava reset (Restart-VM -Force), que perdia o menu de boot — reinício normal resolve.
+Backup (saves e pastas) vai junto na partição temporária e é restaurado antes dela ser apagada.
+Botão "Reinstalar sem pendrive" na aba Criar, com duas confirmações; recusa disco criptografado.
+
 ## Rumo à V1 (10/10/2026)
 
 **1. Identidade visual** (o usuário vai mandar): cores e logo no app (cor de destaque do WPF-UI, ícone .ico do

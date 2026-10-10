@@ -6,7 +6,7 @@ namespace Debloat.Core.Media;
 /// Modo "sem pendrive": cria uma partição temporária DEBLOAT-SETUP (encolhendo o C:), copia a instalação para
 /// ela, prepara um WinPE com o nosso script e agenda UM boot nele. Fluxo completo em PLAN.md.
 /// A partição temporária é apagada no fim do primeiro login (FirstLogon.ps1), depois dos apps — que vêm dela.
-/// NÃO TESTADO EM VM AINDA — a janela não expõe este modo até o teste.
+/// Testado de ponta a ponta na VM em 10/10/2026 (PLAN.md).
 /// </summary>
 public static partial class InPlaceInstaller
 {
@@ -18,7 +18,8 @@ public static partial class InPlaceInstaller
 
   public record Plan(long MediaSize, long PartitionSize, long FreeOnC, bool Encrypted, bool Uefi);
 
-  public static async Task<Plan> CheckAsync(string mediaDir, CancellationToken ct = default)
+  /// <param name="extraBytes">Backup (saves e pastas) que vai junto na partição temporária.</param>
+  public static async Task<Plan> CheckAsync(string mediaDir, CancellationToken ct = default, long extraBytes = 0)
   {
     long media = Directory.EnumerateFiles(mediaDir, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
     string json = (await PowerShell.RunAsync("""
@@ -30,10 +31,15 @@ public static partial class InPlaceInstaller
       "{0}|{1}|{2}|{3}" -f ($c.Size - $s.SizeMin), $encrypted, $env:firmware_type, $c.DiskNumber
       """, ct)).Trim();
     string[] p = json.Split('|');
-    return new Plan(media, media + Slack, long.Parse(p[0]), p[1] == "1", p[2] == "UEFI");
+    return new Plan(media, media + Slack + extraBytes, long.Parse(p[0]), p[1] == "1", p[2] == "UEFI");
   }
 
-  public static async Task PrepareAsync(string mediaDir, IProgress<WriteStep>? progress = null, CancellationToken ct = default)
+  /// <param name="writeBackup">
+  /// Grava o backup (saves, migração) na partição temporária: o C: vai ser formatado e não há pendrive. O FirstLogon
+  /// restaura de lá (procura DEBLOAT-DADOS ou DEBLOAT-SETUP) antes de apagar a partição.
+  /// </param>
+  public static async Task PrepareAsync(string mediaDir, IProgress<WriteStep>? progress = null, CancellationToken ct = default,
+    long backupBytes = 0, Func<string, Task>? writeBackup = null)
   {
     if (!File.Exists(Path.Combine(mediaDir, "boot", "boot.sdi")) || !File.Exists(Path.Combine(mediaDir, "sources", "boot.wim")))
     {
@@ -47,7 +53,7 @@ public static partial class InPlaceInstaller
     }
     // Sobras de uma tentativa anterior (partição, entrada de boot) saem antes de medir o espaço livre.
     await UndoAsync(ct);
-    var plan = await CheckAsync(mediaDir, ct);
+    var plan = await CheckAsync(mediaDir, ct, backupBytes);
     if (!plan.Uefi) throw new InvalidOperationException("O modo sem pendrive só funciona em PCs com UEFI. Use o pendrive.");
     // Com o disco criptografado o WinPE não lê o C: (não acharia o Windows antigo). Melhor avisar agora.
     if (plan.Encrypted) throw new InvalidOperationException("O disco C: está criptografado (BitLocker/criptografia do dispositivo). Desligue a criptografia ou use o pendrive.");
@@ -83,6 +89,11 @@ public static partial class InPlaceInstaller
 
       string debloat = Directory.CreateDirectory(Path.Combine(root, "debloat")).FullName;
       await File.WriteAllTextAsync(Path.Combine(debloat, "alvo.txt"), token, ct);
+      if (writeBackup is not null)
+      {
+        progress?.Report(new("Guardando o backup na partição temporária", 0.66));
+        await writeBackup(root);
+      }
 
       progress?.Report(new("Preparando o ambiente de instalação (WinPE)", 0.7));
       await BuildWinPeAsync(root, ct);

@@ -563,6 +563,42 @@ public partial class MainViewModel : ObservableObject
   }
 
   /// <summary>Faz tudo: baixa, monta, leva os drivers e grava. A janela pergunta antes de chamar.</summary>
+  /// <summary>
+  /// Modo sem pendrive: monta a instalação, cria a partição temporária com ela e o backup, agenda o boot no WinPE e
+  /// reinicia. Falhou antes de reiniciar = o PC volta como estava (InPlaceInstaller desfaz tudo).
+  /// </summary>
+  public async Task InstallInPlaceAsync()
+  {
+    if (!IsAdmin)
+    {
+      Status = "Abra o DEBLOAT como administrador.";
+      return;
+    }
+    var saves = Saves.Where(s => s.IsSelected).Select(s => s.Game).ToList();
+    var migration = Migration.Where(m => m.IsSelected).Select(m => m.Item).ToList();
+    var open = Debloat.Core.Saves.Migration.OpenPrograms(migration);
+    if (open.Count > 0)
+    {
+      Status = $"Feche antes de continuar: {string.Join(", ", open)}.";
+      return;
+    }
+    await RunBusy(async () =>
+    {
+      await PrepareMediaAsync(55);
+      await InPlaceInstaller.PrepareAsync(MediaDir,
+        new Progress<WriteStep>(step => { ProgressValue = 55 + step.Fraction * 45; Status = step.Text + "..."; }),
+        backupBytes: BackupBytes,
+        writeBackup: async root =>
+        {
+          if (saves.Count > 0) await Scanner.BackupAsync(saves, root);
+          if (migration.Count > 0) await Debloat.Core.Saves.Migration.BackupAsync(migration, root, new Progress<string>(text => Status = text));
+        });
+      Status = "Pronto. O PC reinicia em 15 segundos para formatar e instalar.";
+      // Reinício normal (não forçado na hora): o Windows grava as mudanças do menu de boot ao desligar.
+      Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 15") { CreateNoWindow = true, UseShellExecute = false });
+    });
+  }
+
   public async Task WriteUsbAsync(UsbDrive drive)
   {
     if (!IsAdmin)

@@ -171,7 +171,7 @@ public class InPlaceSafetyTests
   [Fact]
   public void Menu_de_boot_so_perde_as_entradas_da_particao_formatada()
   {
-    Assert.Contains("if /i \"%%b\"==\"partition=%TGT%\" if /i not \"!ID!\"==\"{default}\" bcdedit /delete !ID! /f", Script);
+    Assert.Contains("if /i \"%%b\"==\"partition=%TGT%\" if \"!ID:~9,1!\"==\"-\" bcdedit /delete !ID! /f", Script);
     Assert.DoesNotContain("/timeout", Script);
   }
 

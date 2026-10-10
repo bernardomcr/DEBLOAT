@@ -239,8 +239,8 @@ if( $dnsTable.ContainsKey( $dnsChoice ) ) {
 	Write-Log 'dns.log' "DNS aplicado: $dnsChoice"
 }
 
-# --- Saves de jogos (backup do DEBLOAT na partição DEBLOAT-DADOS do pendrive) ---
-$dados = Get-Volume -FileSystemLabel 'DEBLOAT-DADOS' -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -First 1
+# --- Saves de jogos (backup do DEBLOAT na partição DEBLOAT-DADOS do pendrive, ou na DEBLOAT-SETUP do modo sem pendrive) ---
+$dados = Get-Volume -FileSystemLabel 'DEBLOAT-DADOS', 'DEBLOAT-SETUP' -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -First 1
 if( $dados ) {
 	$saves = "$($dados.DriveLetter):\saves"
 	$ludusavi = "$($dados.DriveLetter):\ferramentas\ludusavi.exe"

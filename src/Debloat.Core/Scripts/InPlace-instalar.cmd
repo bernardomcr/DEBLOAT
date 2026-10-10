@@ -87,7 +87,8 @@ rem a nova ({default}) e Windows de outros discos ficam.
 set ID=
 for /f "tokens=1,*" %%a in ('bcdedit /enum osloader') do (
 	if /i "%%a"=="identifier" set ID=%%b
-	if /i "%%a"=="device" if /i "%%b"=="partition=%TGT%" if /i not "!ID!"=="{default}" bcdedit /delete !ID! /f >> "%LOG%" 2>&1
+	rem Só identificadores de verdade ({xxxxxxxx-...}); apelidos como {default}/{current} ficam.
+	if /i "%%a"=="device" if /i "%%b"=="partition=%TGT%" if "!ID:~9,1!"=="-" bcdedit /delete !ID! /f >> "%LOG%" 2>&1
 )
 mountvol %ESP% /d >> "%LOG%" 2>&1
 

@@ -73,4 +73,28 @@ public partial class MainWindow : FluentWindow
 
     await vm.WriteUsbAsync(drive);
   }
+
+  private async void InPlace_Click(object sender, RoutedEventArgs e)
+  {
+    var first = await new Wpf.Ui.Controls.MessageBox
+    {
+      Title = "Reinstalar o Windows neste PC?",
+      Content = "O disco C: deste PC vai ser APAGADO e o Windows 11 reinstalado com o preset.\n\n"
+        + "Só o que estiver marcado na aba Backup volta depois. O resto do C: é perdido.",
+      PrimaryButtonText = "Continuar",
+      CloseButtonText = "Cancelar",
+    }.ShowDialogAsync();
+    if (first != Wpf.Ui.Controls.MessageBoxResult.Primary) return;
+
+    var second = await new Wpf.Ui.Controls.MessageBox
+    {
+      Title = "Confirmação final",
+      Content = "Última chance: apagar o C: e reinstalar? O PC reinicia sozinho no fim da preparação.",
+      PrimaryButtonText = "Apagar e reinstalar",
+      CloseButtonText = "Cancelar",
+    }.ShowDialogAsync();
+    if (second != Wpf.Ui.Controls.MessageBoxResult.Primary) return;
+
+    await vm.InstallInPlaceAsync();
+  }
 }
