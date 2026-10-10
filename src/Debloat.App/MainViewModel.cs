@@ -356,7 +356,9 @@ public partial class MainViewModel : ObservableObject
       preparedFolder = await UupDump.BuildFolderAsync(Http, uup, language, work,
         new Progress<MediaStep>(s => { ProgressValue = s.Fraction * 100; Status = s.Text + "..."; }));
       esdPath = null;
-      Status = "Windows montado.";
+      Status = File.Exists(Path.Combine(work, UupDump.MissingUpdatesFile))
+        ? "Windows montado, sem as atualizações da build (o Windows Update completa depois da instalação)."
+        : "Windows montado.";
       return;
     }
 

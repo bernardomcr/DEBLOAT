@@ -76,7 +76,7 @@ public static partial class UupDump
   {
     Directory.CreateDirectory(workDir);
     // Já convertida antes (ex.: falhou depois, na montagem da mídia): usa direto, sem baixar e converter de novo.
-    if (Converted(workDir) is { } ready) return ready;
+    if (Converted(workDir) is { } ready) return await CheckUpdatesAsync(ready, workDir, build, progress, ct);
     progress?.Report(new("Baixando o conversor do UUP dump", 0.01));
     string converter = await GetConverterAsync(http, build.Uuid, language, workDir, ct);
     string uups = Directory.CreateDirectory(Path.Combine(converter, "UUPs")).FullName;   // onde o convert-UUP.cmd procura
@@ -124,7 +124,45 @@ public static partial class UupDump
     await pump;
     await log.DisposeAsync();
 
-    return Converted(workDir) ?? throw new InvalidOperationException($"O conversor não gerou a instalação. Veja {Path.Combine(workDir, "conversor.log")}.");
+    string folder = Converted(workDir) ?? throw new InvalidOperationException($"O conversor não gerou a instalação. Veja {Path.Combine(workDir, "conversor.log")}.");
+    return await CheckUpdatesAsync(folder, workDir, build, progress, ct);
+  }
+
+  /// <summary>
+  /// O conversor integra as atualizações com o DISM do PC; num PC em que o DISM não consegue mexer em imagem montada
+  /// (erro 87), sai a versão base. Instala normal e o Windows Update completa depois — mas o usuário fica sabendo.
+  /// </summary>
+  private static async Task<string> CheckUpdatesAsync(string folder, string workDir, UupBuild build, IProgress<MediaStep>? progress, CancellationToken ct)
+  {
+    string marker = Path.Combine(workDir, MissingUpdatesFile);
+    if (await HasUpdatesAsync(Path.Combine(workDir, "conversor"), folder, build, ct))
+    {
+      File.Delete(marker);
+      return folder;
+    }
+    await File.WriteAllTextAsync(marker, "", ct);
+    progress?.Report(new("A build veio sem as atualizações (o Windows Update completa depois da instalação)", 1));
+    return folder;
+  }
+
+  /// <summary>Arquivo na pasta de trabalho que marca "conversão sem as atualizações".</summary>
+  public const string MissingUpdatesFile = "sem-atualizacoes.txt";
+
+  /// <summary>A imagem gerada é a build pedida? (wimlib do próprio conversor: "Service Pack Build" = revisão.)</summary>
+  private static async Task<bool> HasUpdatesAsync(string converter, string folder, UupBuild build, CancellationToken ct)
+  {
+    string wim = Path.Combine(folder, "sources", "install.wim");
+    string wimlib = Path.Combine(converter, "bin", "wimlib-imagex.exe");
+    if (!File.Exists(wim) || !File.Exists(wimlib)) return true;   // não dá para conferir: não alarma
+    var psi = new ProcessStartInfo(wimlib) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
+    psi.ArgumentList.Add("info");
+    psi.ArgumentList.Add(wim);
+    psi.ArgumentList.Add("1");
+    using var p = Process.Start(psi)!;
+    string info = await p.StandardOutput.ReadToEndAsync(ct);
+    await p.WaitForExitAsync(ct);
+    var revision = ServicePackRegex().Match(info);
+    return !revision.Success || int.Parse(revision.Groups[1].Value) >= build.Build.Minor;
   }
 
   /// <summary>
@@ -230,6 +268,9 @@ public static partial class UupDump
       await Task.Delay(wait < TimeSpan.FromMinutes(2) ? wait : TimeSpan.FromMinutes(2), ct);
     }
   }
+
+  [GeneratedRegex(@"Service Pack Build:\s*(\d+)")]
+  private static partial Regex ServicePackRegex();
 
   [GeneratedRegex(@"version\s+(\d\d[Hh]\d)")]
   private static partial Regex VersionRegex();

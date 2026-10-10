@@ -97,11 +97,16 @@ public static partial class MediaBuilder
   public static async Task<int> FindEditionIndexAsync(string esdPath, string edition, CancellationToken ct = default, int firstIndex = 4)
   {
     string info = await DismAsync($"/Get-WimInfo /WimFile:\"{esdPath}\"", ct);
-    foreach (int index in IndexRegex().Matches(info).Select(m => int.Parse(m.Groups[1].Value)).Where(i => i >= firstIndex))
+    var indexes = IndexRegex().Matches(info).Select(m => int.Parse(m.Groups[1].Value)).Where(i => i >= firstIndex).ToList();
+    // O conversor do UUP dump gera um install.wim com uma imagem só e sem o campo "Edition": é ela.
+    if (indexes.Count == 1 && firstIndex == 1) return indexes[0];
+    string name = edition.Equals("Professional", StringComparison.OrdinalIgnoreCase) ? "Windows 11 Pro" : $"Windows 11 {edition}";
+    foreach (int index in indexes)
     {
       string detail = await DismAsync($"/Get-WimInfo /WimFile:\"{esdPath}\" /Index:{index}", ct);
       var match = EditionRegex().Match(detail);
       if (match.Success && match.Groups[1].Value.Trim().Equals(edition, StringComparison.OrdinalIgnoreCase)) return index;
+      if (!match.Success && NameRegex().Match(detail) is { Success: true } byName && byName.Groups[1].Value.Trim().Equals(name, StringComparison.OrdinalIgnoreCase)) return index;
     }
     throw new InvalidDataException($"A edição '{edition}' não está nesta imagem.");
   }
@@ -135,4 +140,7 @@ public static partial class MediaBuilder
 
   [GeneratedRegex(@"^Edition\s*:\s*(.+)$", RegexOptions.Multiline)]
   private static partial Regex EditionRegex();
+
+  [GeneratedRegex(@"^Name\s*:\s*(.+)$", RegexOptions.Multiline)]
+  private static partial Regex NameRegex();
 }
