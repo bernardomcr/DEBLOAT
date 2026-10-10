@@ -167,6 +167,15 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 DEBLOAT-DADOS, install.swm em 2 partes) — o Hyper-V não deixa dar boot por mídia removível, então o boot num
 PC físico fica para o usuário; detecção de programas do backup.
 
+**Saves e migração (VM, 10/10/2026):** backup real deste PC num disco DEBLOAT-DADOS → restauração na VM pelo
+bloco do FirstLogon: 2 jogos via Ludusavi, 1 save de emulador Steam (Goldberg) e a pasta do ShareX voltaram no
+lugar certo. Wi-Fi não testado (a VM não tem placa sem fio; usa `netsh wlan add profile`).
+
+**DISM "erro 87" (causa):** neste PC o Windows não carrega nenhum arquivo de registro offline (`reg load` falha
+com "nome do arquivo muito grande" até em `C:\h.dat`; sem Sandboxie, filtros normais). Todo `/Image:` do DISM
+precisa disso. Contornos: UUP avisa da build incompleta; no sem pendrive, os drivers de disco vão também como
+arquivo dentro do WinPE e são carregados com `drvload` no boot.
+
 **Sem teste (incluído a pedido):** Fixar no Iniciar pelo atalho (.lnk) quando a lista de apps não oferece.
 
 **Conhecido:** apps fora do preset podem abrir janelas sozinhos depois de instalar (Riot Client pede firewall,

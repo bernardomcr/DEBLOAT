@@ -10,6 +10,8 @@ rem Qualquer falha ANTES de formatar só reinicia: a entrada de boot era de uso 
 rem para o Windows atual intacto. A partição temporária é apagada no fim do primeiro login (FirstLogon).
 setlocal EnableExtensions EnableDelayedExpansion
 wpeinit
+rem drivers de disco deste PC (NVMe/RAID/VMD), caso o DISM do Windows antigo não tenha conseguido injetar no WinPE
+if exist %SYSTEMDRIVE%\debloat\drivers for /r %SYSTEMDRIVE%\debloat\drivers %%i in (*.inf) do drvload "%%i" >nul 2>&1
 set LETTERS=C D E F G H I J K L M N O P Q R S T U V W Y Z
 
 set SRC=

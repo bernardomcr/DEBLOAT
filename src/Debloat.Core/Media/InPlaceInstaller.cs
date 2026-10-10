@@ -160,6 +160,13 @@ public static partial class InPlaceInstaller
       if (Directory.Exists(drivers))
       {
         await Dism($"/Image:\"{mount}\" /Add-Driver /Driver:\"{drivers}\" /Recurse", ct, allowFailure: true);
+        // Plano B: em alguns PCs o DISM não consegue mexer em imagem nenhuma (reg load falha → "erro 87 na inicialização")
+        // e o Add-Driver acima falha calado. Os drivers de disco vão também como arquivo e o instalar.cmd carrega com drvload.
+        foreach (string cls in new[] { "SCSIAdapter", "HDC" })
+        {
+          string from = Path.Combine(drivers, cls);
+          if (Directory.Exists(from)) CopyFolder(from, Path.Combine(mount, "debloat", "drivers", cls));
+        }
       }
       commit = true;
     }
@@ -168,6 +175,13 @@ public static partial class InPlaceInstaller
       await Dism($"/Unmount-Wim /MountDir:\"{mount}\" /{(commit ? "Commit" : "Discard")}", ct, allowFailure: !commit);
       Directory.Delete(mount, recursive: true);
     }
+  }
+
+  private static void CopyFolder(string from, string to)
+  {
+    foreach (string dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories)) Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
+    Directory.CreateDirectory(to);
+    foreach (string file in Directory.GetFiles(from, "*", SearchOption.AllDirectories)) File.Copy(file, Path.Combine(to, Path.GetRelativePath(from, file)), overwrite: true);
   }
 
   /// <summary>Entrada de ramdisk de uso único (bootsequence): se o WinPE abortar, o próximo boot volta ao Windows atual.</summary>
