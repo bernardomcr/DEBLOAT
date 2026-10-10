@@ -20,7 +20,7 @@ bool reuse = args.Contains("--reusar");
 bool watchOnly = args.Contains("--acompanhar");  // só acompanha a VM que já está rodando (não recria nada)
 if (watchOnly) log = Path.Combine(root, "log-acompanhar.txt");     // reaproveita a mídia já montada e só troca o autounattend.xml
 Directory.CreateDirectory(shots);
-if (!args.Contains("--teclar") && !args.Contains("--coletar") && !args.Contains("--rodar-apps") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
+if (!args.Contains("--teclar") && !args.Contains("--coletar") && !args.Contains("--rodar-apps") && !args.Contains("--sem-pendrive") && !watchOnly) File.WriteAllText(log, "");   // só o teste completo zera o log
 var logLock = new object();
 void Log(string text)
 {
@@ -112,6 +112,62 @@ try
     Log($"Resultado em {output}");
     return;
   }
+  int inPlaceAt = Array.IndexOf(args, "--sem-pendrive");
+  if (inPlaceAt >= 0)
+  {
+    // Testa o modo sem pendrive na VM já instalada (precisa ter sido criada com --senha, para o PowerShell Direct):
+    // 1. disco extra com a instalação (autounattend SEM apagar disco) e o InPlaceRun.exe;
+    // 2. roda o InPlaceRun dentro da VM; 3. se deu OK, reinicia a VM e acompanha a tela.
+    string runner = args[inPlaceAt + 1];
+    string password = args[Array.IndexOf(args, "--senha") + 1];
+    string inPlaceMedia = Path.Combine(root, "midia");
+    string dataVhd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DEBLOAT-VM", "dados.vhdx");
+    string answer = Path.Combine(root, "autounattend-sem-pendrive.xml");
+    File.WriteAllBytes(answer, new UnattendBuilder().BuildBytes(new DebloatOptions { Password = password }));
+    string output = Path.Combine(root, $"sem-pendrive-{DateTime.Now:HHmmss}.log");
+    Log("Montando o disco extra com a instalação e o InPlaceRun");
+    await Ps($$"""
+      Get-VMHardDiskDrive -VMName '{{VmName}}' | Where-Object Path -eq '{{dataVhd}}' | Remove-VMHardDiskDrive
+      Remove-Item -LiteralPath '{{dataVhd}}' -ErrorAction SilentlyContinue
+      $disk = New-VHD -Path '{{dataVhd}}' -SizeBytes 40GB -Dynamic | Mount-VHD -Passthru | Initialize-Disk -PartitionStyle GPT -Passthru
+      try {
+        $p = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
+        Format-Volume -Partition $p -FileSystem NTFS -NewFileSystemLabel 'DEBLOAT-TESTE' -Confirm:$false | Out-Null
+        $l = (Get-Partition -DiskNumber $disk.Number -PartitionNumber $p.PartitionNumber).DriveLetter
+        robocopy.exe '{{inPlaceMedia}}' "$($l):\midia" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /XD '$WinPEDriver$' | Out-Null
+        Copy-Item -LiteralPath '{{answer}}' -Destination "$($l):\midia\autounattend.xml" -Force
+        Copy-Item -LiteralPath '{{runner}}' -Destination "$($l):\InPlaceRun.exe" -Force
+      } finally {
+        Dismount-VHD -Path '{{dataVhd}}'
+      }
+      Add-VMHardDiskDrive -VMName '{{VmName}}' -Path '{{dataVhd}}'
+      """);
+    Log("Rodando o modo sem pendrive dentro da VM (PowerShell Direct)");
+    await Ps($$"""
+      $cred = New-Object System.Management.Automation.PSCredential('Usuario', (ConvertTo-SecureString '{{password}}' -AsPlainText -Force))
+      $s = New-PSSession -VMName '{{VmName}}' -Credential $cred -ErrorAction Stop
+      try {
+        $result = Invoke-Command -Session $s -ScriptBlock {
+          Start-Sleep -Seconds 5   # o disco extra acabou de chegar
+          $l = (Get-Volume -FileSystemLabel 'DEBLOAT-TESTE').DriveLetter
+          & "$($l):\InPlaceRun.exe" "$($l):\midia" 2>&1
+          "SAIDA=$LASTEXITCODE"
+          Get-Partition | Format-Table DiskNumber, PartitionNumber, DriveLetter, Size, Type -AutoSize | Out-String
+          bcdedit.exe /enum all | Out-String
+        }
+        $result | Out-File '{{output}}' -Encoding UTF8
+        if( ($result -join "`n") -notmatch 'SAIDA=0' ) { throw "O InPlaceRun falhou; veja {{output}}" }
+      } finally {
+        Remove-PSSession $s
+      }
+      Restart-VM -Name '{{VmName}}' -Force
+      """);
+    Log($"InPlaceRun OK (saída em {output}); VM reiniciada no WinPE");
+    var inPlaceScope = new ManagementScope(@"\\.\root\virtualization\v2");
+    inPlaceScope.Connect();
+    await Watch(inPlaceScope, (string)Query(inPlaceScope, $"SELECT * FROM Msvm_ComputerSystem WHERE ElementName='{VmName}'").First()["Name"]);
+    return;
+  }
   int typeAt = Array.IndexOf(args, "--teclar");
   if (typeAt >= 0)
   {
@@ -175,7 +231,9 @@ try
   Log("Removendo VM antiga, se houver");
   await Ps($"if( Get-VM -Name '{VmName}' -ErrorAction SilentlyContinue ) {{ Stop-VM -Name '{VmName}' -TurnOff -Force; Remove-VM -Name '{VmName}' -Force }}; Remove-Item -LiteralPath '{vhd}' -ErrorAction SilentlyContinue");
 
-  var options = new DebloatOptions { WipeDisk0 = true };
+  // --senha: só para a VM de teste (o PowerShell Direct recusa conta sem senha); o preset de verdade não tem senha.
+  int passwordAt = Array.IndexOf(args, "--senha");
+  var options = new DebloatOptions { WipeDisk0 = true, Password = passwordAt >= 0 ? args[passwordAt + 1] : "" };
   byte[] xml = new UnattendBuilder().BuildBytes(options);
   if (reuse && File.Exists(Path.Combine(media, "setup.exe")))
   {

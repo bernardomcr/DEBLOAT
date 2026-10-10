@@ -11,6 +11,7 @@
     <Project Path="tests/Debloat.Core.Tests/Debloat.Core.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/InPlaceRun/InPlaceRun.csproj" />
     <Project Path="tools/VmTest/VmTest.csproj" />
   </Folder>
 </Solution>
