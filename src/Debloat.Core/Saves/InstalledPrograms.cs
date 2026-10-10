@@ -21,6 +21,9 @@ public static partial class InstalledPrograms
   {
     var catalogPackages = catalog.Select(a => a.Package).ToHashSet(StringComparer.OrdinalIgnoreCase);
     var catalogNames = catalog.Select(a => a.Name).ToList();
+    // Palavras do ID do pacote sem o fabricante: VideoLAN.VLC → VLC; EclipseAdoptium.Temurin.17.JRE → Temurin, JRE.
+    var catalogTokens = catalog.Select(a => a.Package.Split('.').Skip(1).Where(t => t.Length >= 3 && t.All(char.IsLetter)).Select(t => t.ToLowerInvariant()).ToList())
+      .Where(t => t.Count > 0).ToList();
     var registry = ReadRegistry();
     var winget = await WingetListAsync(ct);
     var result = new List<InstalledProgram>();
@@ -39,6 +42,8 @@ public static partial class InstalledPrograms
       if (used.Contains(entry.Name) || Noise(entry.Name) || entry.Folder is null || FromLauncher(entry.Folder)) continue;
       // "Wand" no PC é o "Wand (antigo WeMod)" do catálogo: vale também a primeira palavra do nome.
       if (catalogNames.Any(n => SameName(entry.Name, n) || Normalize(entry.Name) == Normalize(n.Split(' ')[0]))) continue;
+      // Sem o winget (ou com nome diferente no PC: "VLC media player", "Eclipse Temurin JRE..."), pelo ID do pacote.
+      if (catalogTokens.Any(tokens => tokens.All(t => Normalize(entry.Name).Contains(t, StringComparison.Ordinal)))) continue;
       if (winget.Any(w => SameName(entry.Name, w.Name))) continue;
       long bytes = Migration.Size(entry.Folder, []);
       if (bytes == 0) continue;
@@ -89,13 +94,36 @@ public static partial class InstalledPrograms
         string? exe = (key.GetValue("DisplayIcon") as string)?.Split(',')[0].Trim().Trim('"');
         if (exe is null || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || folder is null || !exe.StartsWith(folder, StringComparison.OrdinalIgnoreCase) || !File.Exists(exe))
         {
-          exe = folder is null ? null : Directory.EnumerateFiles(folder, "*.exe").FirstOrDefault(f => !Path.GetFileName(f).StartsWith("unins", StringComparison.OrdinalIgnoreCase));
+          exe = folder is null ? null : MainExe(folder, name);
         }
         list.Add((name.Trim(), folder, exe));
       }
     }
     return list;
   }
+
+  /// <summary>
+  /// Executável principal quando o registro não diz: até duas pastas abaixo (CMake fica em bin\cmake-gui.exe),
+  /// preferindo o que tem o nome do programa e evitando desinstalador, atualizador e relatório de erro.
+  /// </summary>
+  private static string? MainExe(string folder, string name)
+  {
+    string first = Normalize(name.Split(' ').FirstOrDefault() ?? "");
+    var exes = new List<string>();
+    try
+    {
+      exes.AddRange(Directory.EnumerateFiles(folder, "*.exe"));
+      foreach (string sub in Directory.EnumerateDirectories(folder).Take(40)) exes.AddRange(Directory.EnumerateFiles(sub, "*.exe"));
+    }
+    catch (Exception e) when (e is UnauthorizedAccessException or IOException) { }
+    var candidates = exes.Where(f => !HelperExeRegex().IsMatch(Path.GetFileName(f))).ToList();
+    return candidates.FirstOrDefault(f => first.Length >= 3 && Normalize(Path.GetFileNameWithoutExtension(f)).StartsWith(first, StringComparison.Ordinal))
+      ?? candidates.FirstOrDefault(f => Path.GetDirectoryName(f) == folder)
+      ?? candidates.FirstOrDefault();
+  }
+
+  [GeneratedRegex(@"^(unins|uninst|update|updater|crash|report|helper|setup|install)", RegexOptions.IgnoreCase)]
+  private static partial Regex HelperExeRegex();
 
   /// <summary>"winget list --source winget": só o que o winget sabe instalar, com o ID oficial.</summary>
   private static async Task<List<(string Name, string Id)>> WingetListAsync(CancellationToken ct)
