@@ -148,6 +148,28 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
    ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
+## Rumo à V1 (10/10/2026)
+
+**1. Identidade visual** (o usuário vai mandar): cores e logo no app (cor de destaque do WPF-UI, ícone .ico do
+executável e da janela, título), no aviso do primeiro login e na janela "Preparando"; nome do volume da
+ISO/pendrive. Sem textos explicativos na interface.
+
+**2. Testes finais**
+- a. VM do zero (sem `--reusar`) com o script novo: medir a lista (meta ≤ 5 min), conferir filas em paralelo,
+  .NET 3.5 já ativo, Loja de primeira, sem espera no fim, janelas fechadas, aviso, setinha e relógio.
+- b. Build pelo UUP dump (ex.: 26H2) escolhida no app → ISO → VM até a área de trabalho.
+- c. Modo sem pendrive dentro da VM (que já tem Windows): disco extra com o DEBLOAT + mídia, rodar, conferir
+  partição, instalação e devolução do espaço. Passou → aparece no app; não passou → fica escondido na V1.
+- d. Passada pelo app inteiro: todas as abas, exportar XML, backup com saves (Ludusavi) e pastas,
+  gravar um pendrive de verdade.
+- e. "Introdução" no Iniciar: uma última tentativa; se não sair, fica como problema conhecido.
+
+**3. V1**
+- Versão 1.0.0 no projeto, ícone, manifesto de administrador.
+- `dotnet publish` arquivo único (win-x64, autocontido) — o CI já faz; conferir o .exe final.
+- README com capturas de tela; aviso de que o Windows SmartScreen reclama (sem certificado de assinatura).
+- Tag `v1.0.0` e release no GitHub com o .exe.
+
 ## Próximas tarefas combinadas (09/10/2026)
 
 1. ✅ **Aviso na tela no primeiro login** (10/10/2026): janelinha escura no canto inferior direito,
