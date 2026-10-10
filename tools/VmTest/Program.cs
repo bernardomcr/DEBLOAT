@@ -235,7 +235,14 @@ try
 
   // --senha: só para a VM de teste (o PowerShell Direct recusa conta sem senha); o preset de verdade não tem senha.
   int passwordAt = Array.IndexOf(args, "--senha");
-  var options = new DebloatOptions { WipeDisk0 = true, Password = passwordAt >= 0 ? args[passwordAt + 1] : "" };
+  // --todos-apps: marca o catálogo inteiro (para testar também os apps que não estão no preset).
+  bool allApps = args.Contains("--todos-apps");
+  var options = new DebloatOptions
+  {
+    WipeDisk0 = true,
+    Password = passwordAt >= 0 ? args[passwordAt + 1] : "",
+    SelectedApps = allApps ? AppCatalog.Load().Apps.Select(a => a.Id).ToList() : null,
+  };
   byte[] xml = new UnattendBuilder().BuildBytes(options);
   if (reuse && File.Exists(Path.Combine(media, "setup.exe")))
   {
@@ -249,7 +256,7 @@ try
   }
   Log("Baixando os instaladores dos apps para a mídia");
   var appCatalog = AppCatalog.Load();
-  var presetApps = appCatalog.Resolve(appCatalog.Defaults.Select(a => a.Id));
+  var presetApps = appCatalog.Resolve(options.SelectedApps ?? appCatalog.Defaults.Select(a => a.Id));
   using (var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan })
   {
     var offline = await OfflineInstallers.PrepareAsync(http, presetApps, Path.Combine(root, "..", "cache", "apps"), media,
