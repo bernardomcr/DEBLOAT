@@ -148,6 +148,23 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
    ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
+## Próximas tarefas combinadas (09/10/2026)
+
+1. **Aviso na tela no primeiro login**: janelinha no canto, "Instalando apps: 12 de 45 — Google Chrome",
+   que some no final. Na VM o usuário ficou ~10 min olhando a área de trabalho sem saber se estava rodando.
+2. **Fechar as janelas de boas-vindas** que os apps abrem ao terminar de instalar (Discord, Tailscale,
+   PowerToys...).
+3. **Downloads em paralelo** no início do primeiro login (instalação continua em fila: o Windows Installer
+   só aceita um por vez) e, depois, **instaladores em cache no pendrive**. Medido na VM: lista inteira
+   ~15–20 min, sendo ~5 min só do .NET 3.5.
+4. **Rodada completa final na VM** antes de usar num PC de verdade, conferindo também o Wand pelo plano B
+   (curl + assinatura "WeMod LLC") e o RustDesk (GitHub).
+5. VM: parar de recriar tudo a cada ajuste — checkpoint do Hyper-V logo após a instalação e testar só o
+   pedaço que mudou. (O PowerShell Direct recusa conta sem senha; a edição offline do registro da VM
+   falhou na letra de unidade — revisar se for usar.)
+6. "Introdução" ainda aparece nas recomendações do Iniciar (HideRecommendedSection por máquina e por
+   usuário e Start_TrackProgs não bastaram). Cosmético; investigar.
+
 ## Teste em VM (09/10/2026) — `tools/VmTest`
 
 Hyper-V, Geração 2, Secure Boot + TPM, disco de 80 GB, pendrive simulado por ISO (modo `WipeDisk0`).
