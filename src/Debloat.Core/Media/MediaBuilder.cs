@@ -16,8 +16,9 @@ public static partial class MediaBuilder
   /// <summary>Limite do FAT32; acima disso o install.wim vira install.swm em partes.</summary>
   public const long Fat32Limit = 4L * 1024 * 1024 * 1024 - 1;
 
+  /// <param name="features">Recursos do Windows ativados direto na imagem (ex.: NetFx3): no primeiro login já vêm prontos.</param>
   public static async Task BuildAsync(string esdPath, string mediaDir, string edition, byte[]? autounattend,
-    IProgress<MediaStep>? progress = null, CancellationToken ct = default)
+    IProgress<MediaStep>? progress = null, CancellationToken ct = default, IReadOnlyList<string>? features = null)
   {
     if (Directory.Exists(mediaDir)) Directory.Delete(mediaDir, recursive: true);
     Directory.CreateDirectory(mediaDir);
@@ -39,6 +40,7 @@ public static partial class MediaBuilder
     progress?.Report(new($"Extraindo o Windows 11 ({edition})", 0.35));
     string installWim = Path.Combine(sources, "install.wim");
     await DismAsync($"/Export-Image /SourceImageFile:\"{esdPath}\" /SourceIndex:{editionIndex} /DestinationImageFile:\"{installWim}\" /Compress:max /CheckIntegrity", ct);
+    await EnableFeaturesAsync(installWim, Path.Combine(sources, "sxs"), features, progress, 0.7, ct);
 
     if (new FileInfo(installWim).Length > Fat32Limit)
     {
@@ -59,7 +61,7 @@ public static partial class MediaBuilder
   /// pedida no install.wim, divide para FAT32 e põe o autounattend.xml.
   /// </summary>
   public static async Task BuildFromFolderAsync(string folder, string mediaDir, string edition, byte[]? autounattend,
-    IProgress<MediaStep>? progress = null, CancellationToken ct = default)
+    IProgress<MediaStep>? progress = null, CancellationToken ct = default, IReadOnlyList<string>? features = null)
   {
     if (Directory.Exists(mediaDir)) Directory.Delete(mediaDir, recursive: true);
     progress?.Report(new("Copiando a instalação montada", 0.6));
@@ -82,6 +84,7 @@ public static partial class MediaBuilder
       File.Delete(installWim);
       File.Move(only, installWim);
     }
+    await EnableFeaturesAsync(installWim, Path.Combine(sources, "sxs"), features, progress, 0.85, ct);
     if (new FileInfo(installWim).Length > Fat32Limit)
     {
       progress?.Report(new("Dividindo a imagem para caber em FAT32", 0.9));
@@ -90,6 +93,44 @@ public static partial class MediaBuilder
     }
     if (autounattend is not null) await File.WriteAllBytesAsync(Path.Combine(mediaDir, "autounattend.xml"), autounattend, ct);
     progress?.Report(new("Pronto", 1));
+  }
+
+  /// <summary>
+  /// Ativa recursos (o .NET 3.5 leva ~5 min no primeiro login) na imagem montada, com a fonte sources\sxs da própria
+  /// mídia. Aqui, no PC que monta a mídia, leva 1–3 min e o primeiro login não espera nada.
+  /// </summary>
+  private static async Task EnableFeaturesAsync(string installWim, string sxs, IReadOnlyList<string>? features,
+    IProgress<MediaStep>? progress, double fraction, CancellationToken ct)
+  {
+    if (features is not { Count: > 0 } || !Directory.Exists(sxs)) return;
+    progress?.Report(new("Ativando o .NET Framework 3.5 na imagem", fraction));
+    string mount = Path.Combine(Path.GetTempPath(), "DEBLOAT-montagem");
+    if (Directory.Exists(mount))
+    {
+      // Sobra de uma montagem interrompida: descarta antes de usar a pasta de novo.
+      try { await DismAsync($"/Unmount-Image /MountDir:\"{mount}\" /Discard", ct); } catch (InvalidOperationException) { }
+      await DismAsync("/Cleanup-Wim", ct);
+      Directory.Delete(mount, recursive: true);
+    }
+    Directory.CreateDirectory(mount);
+    await DismAsync($"/Mount-Image /ImageFile:\"{installWim}\" /Index:1 /MountDir:\"{mount}\"", ct);
+    try
+    {
+      foreach (string feature in features)
+      {
+        await DismAsync($"/Image:\"{mount}\" /Enable-Feature /FeatureName:{feature} /All /LimitAccess /Source:\"{sxs}\"", ct);
+      }
+      await DismAsync($"/Unmount-Image /MountDir:\"{mount}\" /Commit", ct);
+    }
+    catch
+    {
+      await DismAsync($"/Unmount-Image /MountDir:\"{mount}\" /Discard", CancellationToken.None);
+      throw;
+    }
+    finally
+    {
+      try { Directory.Delete(mount, recursive: true); } catch (IOException) { }
+    }
   }
 
   /// <summary>Procura o índice da edição pelo campo "Edition" (ex.: Professional), que não muda com o idioma.</summary>

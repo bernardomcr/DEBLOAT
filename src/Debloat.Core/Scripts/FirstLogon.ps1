@@ -105,16 +105,34 @@ Set-Notice 'Preparando o Windows' 'Ajustes finais'
 Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$noticeScript`" -Status `"$progressFile`" -Parent $PID"
 
 # --- Janelas de boas-vindas: o que os instaladores abrem sozinhos (Discord, Tailscale, PowerToys...) ---
-$keepWindows = @( 'explorer', 'powershell', 'pwsh', 'conhost', 'WindowsTerminal', 'SystemSettings', 'TextInputHost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LockApp' )
+$keepWindows = @( 'explorer', 'powershell', 'pwsh', 'conhost', 'WindowsTerminal', 'SystemSettings', 'TextInputHost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LockApp', 'msiexec' )
 $baseline = @( Get-Process | ForEach-Object Id )
+$baselineFile = Join-Path $root 'processos-iniciais.txt'
+$baseline | Set-Content -LiteralPath $baselineFile
 
 function Close-NewWindows {
 	# WM_CLOSE (como clicar no X): apps de bandeja continuam rodando, só a janela some.
-	Get-Process | Where-Object { $_.Id -notin $baseline -and $_.MainWindowHandle -ne 0 -and $_.ProcessName -notin $keepWindows } | ForEach-Object {
+	# Instaladores rodando em paralelo (e os processos que eles abriram) ficam de fora: fechar a janela cancelaria.
+	$busy = @( $script:running | ForEach-Object { $_.Process.Id } )
+	if( $busy.Count -gt 0 ) { $busy += @( Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -in $busy } | ForEach-Object ProcessId ) }
+	Get-Process | Where-Object { $_.Id -notin $baseline -and $_.Id -notin $busy -and $_.MainWindowHandle -ne 0 -and $_.ProcessName -notin $keepWindows } | ForEach-Object {
 		Write-Log 'apps.log' "  fechando janela: $($_.ProcessName) — $($_.MainWindowTitle)"
 		$_.CloseMainWindow() | Out-Null
 	}
 }
+
+$sweepScript = Join-Path $root 'fechar-janelas.ps1'
+@'
+param( [string] $Baseline )
+$keep = @( 'explorer', 'powershell', 'pwsh', 'conhost', 'WindowsTerminal', 'SystemSettings', 'TextInputHost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LockApp', 'msiexec' )
+$initial = @( Get-Content -LiteralPath $Baseline | ForEach-Object { [int] $_ } )
+$end = (Get-Date).AddSeconds( 45 )
+while( (Get-Date) -lt $end ) {
+	Get-Process | Where-Object { $_.Id -notin $initial -and $_.MainWindowHandle -ne 0 -and $_.ProcessName -notin $keep } | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+	Start-Sleep -Seconds 2
+}
+Remove-Item -LiteralPath $Baseline -ErrorAction SilentlyContinue
+'@ | Set-Content -LiteralPath $sweepScript -Encoding UTF8
 
 #region tweak:servicos-telemetria
 foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
@@ -394,19 +412,31 @@ function Initialize-Online {
 	$script:onlineReady = $true
 	if( -not (Wait-Internet) ) { Write-Log 'apps.log' 'Sem internet: apps que não vieram na mídia não foram instalados. Rode C:\Debloat\reinstalar-apps.ps1 depois.' }
 	$script:winget = Get-Winget
-	if( -not $script:winget ) { Write-Log 'apps.log' 'winget não apareceu em 5 minutos; apps do winget/Loja vão falhar.' }
+	if( -not $script:winget ) { Write-Log 'apps.log' 'winget não apareceu em 5 minutos; apps do winget/Loja vão falhar.'; return }
+	if( @( $apps | Where-Object source -eq 'msstore' ).Count -gt 0 ) {
+		# 0x8A15005E: o winget que vem no Windows não reconhece o certificado atual da Loja. Exceção documentada
+		# pela Microsoft, ligada só durante a lista (desligada no fim).
+		& $script:winget settings --enable BypassCertificatePinningForMicrosoftStore | Out-Null
+	}
 }
 
 function Enable-FromMedia([string] $Feature) {
-	# Recursos como o .NET 3.5 vêm da pasta sources\sxs do pendrive, sem internet (leva uns 5 min).
+	# O DEBLOAT já ativa o .NET 3.5 na imagem ao montar a mídia; isto só roda se não veio (leva uns 5 min).
+	if( (Get-WindowsOptionalFeature -Online -FeatureName $Feature -ErrorAction SilentlyContinue).State -eq 'Enabled' ) {
+		Write-Log 'apps.log' '  já veio ativado na imagem'
+		return
+	}
+	# Fonte: a pasta sources\sxs do pendrive, sem internet.
 	foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 		$sxs = Join-Path $drive.RootDirectory 'sources\sxs'
 		if( Test-Path -LiteralPath $sxs ) {
 			Enable-WindowsOptionalFeature -Online -FeatureName $Feature -Source $sxs -NoRestart -All -ErrorAction Stop | Out-Null
+			Write-Log 'apps.log' '  recurso do Windows ativado'
 			return
 		}
 	}
 	Enable-WindowsOptionalFeature -Online -FeatureName $Feature -NoRestart -All -ErrorAction Stop | Out-Null
+	Write-Log 'apps.log' '  recurso do Windows ativado'
 }
 
 # Instaladores que o DEBLOAT já pôs no pendrive/ISO. Copia antes: o pendrive pode ser tirado no meio.
@@ -417,6 +447,13 @@ $winget = $null
 foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 	$source = Join-Path $drive.RootDirectory 'DEBLOAT\apps'
 	if( Test-Path -LiteralPath "$source\offline.json" ) {
+		# Mais de 14 dias: .NET, VC++, Python etc. já podem ter versão nova. Com internet, baixa tudo de novo.
+		$created = [datetime]::MinValue
+		$age = if( [datetime]::TryParseExact( (Get-Content -LiteralPath "$source\criado.txt" -ErrorAction SilentlyContinue | Select-Object -First 1), 'yyyy-MM-dd', $null, 'None', [ref] $created ) ) { ((Get-Date) - $created).Days } else { 0 }
+		if( $age -gt 14 -and (Wait-Internet) ) {
+			Write-Log 'apps.log' "Os instaladores da mídia têm $age dias: baixando as versões novas pela internet"
+			break
+		}
 		robocopy.exe $source $offlineDir /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
 		foreach( $item in (Get-Content -LiteralPath "$offlineDir\offline.json" -Raw | ConvertFrom-Json) ) { $offline[$item.id] = $item }
 		Write-Log 'apps.log' "$($offline.Count) instaladores vieram na mídia ($($drive.Name))"
@@ -424,78 +461,156 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 	}
 }
 
-if( $apps.Count -gt 0 ) {
-	$index = 0
-	foreach( $app in $apps ) {
-		Close-NewWindows   # o que o app anterior abriu
-		$index++
-		Set-Notice "Instalando apps: $index de $($apps.Count)" $app.name -1
-		Write-Log 'apps.log' "Instalando $($app.name)..."
-		if( $offline.ContainsKey( $app.id ) ) {
-			try {
-				if( Install-Offline $offline[$app.id] ) { continue }
-			} catch {
-				Write-Log 'apps.log' "  ERRO na mídia: $_"
-			}
-			Write-Log 'apps.log' '  tentando pela internet'
-		}
-		Initialize-Online
+function Install-App($App) {
+	# Um app na fila normal: primeiro pelo instalador da mídia, senão pela internet.
+	Write-Log 'apps.log' "Instalando $($App.name)..."
+	if( $offline.ContainsKey( $App.id ) ) {
 		try {
-			switch( $app.source ) {
-				'feature' {
-					Enable-FromMedia $app.package
-					Write-Log 'apps.log' "  recurso do Windows ativado"
-				}
-				'winget' {
-					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
-					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
-					if( $app.architecture ) { $wingetArgs += @( '--architecture', $app.architecture, '--force' ) }
-					$code = Invoke-Winget $wingetArgs
-					# Segunda tentativa para falhas passageiras (na VM o instalador do Hydra travou uma vez e na outra passou).
-					# Não repete "já instalado" (-1978335189) nem hash desatualizado (-1978335215): esses não mudam.
-					if( $code -ne 0 -and $code -notin @( -1978335189, -1978335215 ) ) {
-						Start-Sleep -Seconds 10
-						$code = Invoke-Winget $wingetArgs
-					}
-					if( $code -ne 0 -and $app.fallbackUrl ) { Install-FromVendor $app }
-				}
-				'msstore' {
-					$storeArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
-					$code = Invoke-Winget $storeArgs
-					if( $code -eq -1978335138 ) {
-						# 0x8A15005E: o winget que vem no Windows não reconhece o certificado atual da Loja.
-						# Liga a exceção documentada pela Microsoft só para esta tentativa e desliga em seguida.
-						& $winget settings --enable BypassCertificatePinningForMicrosoftStore | Out-Null
-						$code = Invoke-Winget $storeArgs
-						& $winget settings --disable BypassCertificatePinningForMicrosoftStore | Out-Null
-					}
-				}
-				'url' {
-					$file = Join-Path $env:TEMP ([uri] $app.package).Segments[-1]
-					Get-File $app.package $file
-					Install-Downloaded $file $app.args | Out-Null
-				}
-				'github' {
-					$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($app.package)/releases/latest" -Headers @{ 'User-Agent' = 'DEBLOAT' }
-					$asset = $release.assets | Where-Object { $_.name -match $app.asset } | Select-Object -First 1
-					$file = Join-Path $env:TEMP $asset.name
-					Get-File $asset.browser_download_url $file
-					Install-Downloaded $file $app.args | Out-Null
-				}
-			}
+			if( Install-Offline $offline[$App.id] ) { return }
 		} catch {
-			Write-Log 'apps.log' "  ERRO: $_"
+			Write-Log 'apps.log' "  ERRO na mídia: $_"
+		}
+		Write-Log 'apps.log' '  tentando pela internet'
+	}
+	if( $App.source -ne 'feature' ) { Initialize-Online }
+	try {
+		switch( $App.source ) {
+			'feature' {
+				Enable-FromMedia $App.package
+			}
+			'winget' {
+				$wingetArgs = @( 'install', '--exact', '--id', $App.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
+				# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
+				if( $App.architecture ) { $wingetArgs += @( '--architecture', $App.architecture, '--force' ) }
+				$code = Invoke-Winget $wingetArgs
+				# Segunda tentativa para falhas passageiras (na VM o instalador do Hydra travou uma vez e na outra passou).
+				# Não repete "já instalado" (-1978335189) nem hash desatualizado (-1978335215): esses não mudam.
+				if( $code -ne 0 -and $code -notin @( -1978335189, -1978335215 ) ) {
+					Start-Sleep -Seconds 10
+					$code = Invoke-Winget $wingetArgs
+				}
+				if( $code -ne 0 -and $code -ne -1978335189 -and $App.fallbackUrl ) { Install-FromVendor $App }
+			}
+			'msstore' {
+				Invoke-Winget @( 'install', '--exact', '--id', $App.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' ) | Out-Null
+			}
+			'url' {
+				$file = Join-Path $env:TEMP ([uri] $App.package).Segments[-1]
+				Get-File $App.package $file
+				Install-Downloaded $file $App.args | Out-Null
+			}
+			'github' {
+				$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($App.package)/releases/latest" -Headers @{ 'User-Agent' = 'DEBLOAT' }
+				$asset = $release.assets | Where-Object { $_.name -match $App.asset } | Select-Object -First 1
+				$file = Join-Path $env:TEMP $asset.name
+				Get-File $asset.browser_download_url $file
+				Install-Downloaded $file $App.args | Out-Null
+			}
+		}
+	} catch {
+		Write-Log 'apps.log' "  ERRO: $_"
+	}
+}
+
+# --- Duas filas ao mesmo tempo ---
+# O Windows só instala um pacote MSI por vez (o segundo falha com 1618). Instaladores NSIS, Inno e MSIX não usam
+# o Windows Installer: rodam ao lado da fila normal, até 3 de cada vez. Se algum esbarrar (1618 ou outro erro),
+# volta para a fila normal no fim.
+$running = @()
+$parallelQueue = New-Object System.Collections.Queue
+$retry = New-Object System.Collections.ArrayList
+$current = $null
+$done = 0
+
+function Update-Notice {
+	$names = @( @( $script:current ) + @( $script:running | ForEach-Object { $_.App.name } ) | Where-Object { $_ } )
+	Set-Notice "Instalando apps: $script:done de $($apps.Count)" ($names -join ', ') -1
+}
+
+function Start-Parallel {
+	while( $script:running.Count -lt 3 -and $script:parallelQueue.Count -gt 0 ) {
+		$app = $script:parallelQueue.Dequeue()
+		$item = $offline[$app.id]
+		$file = Join-Path $offlineDir $item.file
+		Write-Log 'apps.log' "Instalando $($app.name) (em paralelo)..."
+		try {
+			if( $item.kind -eq 'msix' ) {
+				Add-AppxPackage -Path $file -ErrorAction Stop
+				Write-Log 'apps.log' "  $($app.name): instalado da mídia"
+				Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+				$script:done++
+				continue
+			}
+			if( $item.args ) {
+				$p = Start-Process -FilePath $file -ArgumentList $item.args -PassThru
+			} else {
+				$p = Start-Process -FilePath $file -PassThru
+			}
+			$null = $p.Handle   # sem guardar o handle agora, o PowerShell 5.1 perde o código de saída
+			$script:running += [pscustomobject]@{ App = $app; Item = $item; Process = $p; File = $file }
+		} catch {
+			Write-Log 'apps.log' "  $($app.name): ERRO $_; tenta de novo na fila normal"
+			[void] $script:retry.Add( $app )
+		}
+	}
+	Update-Notice
+}
+
+function Receive-Parallel {
+	foreach( $job in @( $script:running | Where-Object { $_.Process.HasExited } ) ) {
+		$script:running = @( $script:running | Where-Object { $_ -ne $job } )
+		$code = $job.Process.ExitCode
+		if( $code -in (@( 0, 1641, 3010 ) + @( $job.Item.successCodes )) ) {
+			Write-Log 'apps.log' "  $($job.App.name): instalador saiu com $code"
+			Remove-Item -LiteralPath $job.File -ErrorAction SilentlyContinue
+			$script:done++
+		} else {
+			Write-Log 'apps.log' "  $($job.App.name): instalador saiu com $code; tenta de novo na fila normal"
+			[void] $script:retry.Add( $job.App )
 		}
 	}
 }
 
-Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
-if( $apps.Count -gt 0 ) {
-	# Alguns abrem a janela só depois de se atualizarem (o Discord leva uns segundos).
-	Set-Notice 'Finalizando' 'Fechando as janelas de boas-vindas' 100
-	Start-Sleep -Seconds 15
-	Close-NewWindows
+$serial = @()
+foreach( $app in $apps ) {
+	$item = $offline[$app.id]
+	if( $item -and $item.parallel -and -not $item.signer ) { $parallelQueue.Enqueue( $app ) } else { $serial += $app }
 }
+
+if( $apps.Count -gt 0 ) {
+	Start-Parallel
+	foreach( $app in $serial ) {
+		Receive-Parallel
+		Close-NewWindows   # o que os apps que já terminaram abriram
+		$current = $app.name
+		Start-Parallel
+		Install-App $app
+		$current = $null
+		$done++
+	}
+	while( $running.Count -gt 0 -or $parallelQueue.Count -gt 0 ) {
+		Receive-Parallel
+		Close-NewWindows
+		Start-Parallel
+		Start-Sleep -Milliseconds 500
+	}
+	foreach( $app in @( $retry ) ) {
+		$current = $app.name
+		Update-Notice
+		Install-App $app
+		$done++
+	}
+	$current = $null
+	Close-NewWindows
+	if( $onlineReady -and $winget -and @( $apps | Where-Object source -eq 'msstore' ).Count -gt 0 ) {
+		& $winget settings --disable BypassCertificatePinningForMicrosoftStore | Out-Null
+	}
+	# Alguns abrem a janela só depois de se atualizarem (o Discord leva uns segundos): um processo à parte
+	# continua fechando por 45 s, sem segurar o resto do script.
+	Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$sweepScript`" -Baseline `"$baselineFile`""
+}
+
+Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
 #region tweak:sudo

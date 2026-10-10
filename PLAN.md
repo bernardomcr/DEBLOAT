@@ -184,6 +184,21 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
   (Discord, VC++ AIO, Telegram). O ChatGPT da Loja aparece como pacote "OpenAI.Codex" — é o próprio app.
 - Ajustes pedidos depois de ver a VM: relógio sem segundos e bandeja com a setinha (^) no preset.
 
+## Velocidade do primeiro login (10/10/2026)
+
+1. **.NET 3.5 na imagem:** `MediaBuilder` monta o install.wim e ativa o NetFx3 com a fonte sources\sxs da
+   própria mídia (1–3 min no PC que monta a mídia). No primeiro login ele já está ativo (5 min a menos).
+2. **Duas filas:** MSI um por vez (o Windows Installer só aceita um) + até 3 instaladores NSIS/Inno/MSIX em
+   paralelo. Erro (ex.: 1618) volta para a fila normal no fim. Simulado no PowerShell 5.1 com instaladores
+   falsos: paralelos junto com o MSI, 1618 refeito na fila normal, 6 de 6.
+3. **Loja:** exceção de certificado (`BypassCertificatePinningForMicrosoftStore`) ligada de cara e desligada
+   no fim — antes cada app da Loja falhava uma vez.
+4. **Sem a espera final de 15 s:** um processo à parte fecha janelas de boas-vindas por 45 s.
+- Excluir do Defender: descartado pelo usuário.
+- **Versões:** os instaladores são os mais novos do dia em que a mídia é montada (cache de 3 dias). Mídia com
+  mais de 14 dias (`DEBLOATpps\criado.txt`) + internet → o primeiro login ignora e baixa tudo de novo.
+- Estimativa: lista de 12 min → ~4–5 min. Conferir na rodada final da VM.
+
 ## Vídeo (10/10/2026)
 
 - **Limpeza do vídeo:** o DriverExporter nunca leva drivers de vídeo para o pendrive (só Net, disco, USB

@@ -12,7 +12,8 @@ public enum OfflineState { Waiting, Downloading, Ready, Online }
 public record OfflineProgress(string Id, OfflineState State, long Bytes = 0, string? Note = null);
 
 /// <summary>Um instalador que vai dentro da mídia; o FirstLogon.ps1 lê a lista em DEBLOAT\apps\offline.json.</summary>
-public record OfflineInstaller(string Id, string File, string Kind, string? Args, IReadOnlyList<int> SuccessCodes, string? Signer = null);
+/// <param name="Parallel">Não usa o Windows Installer (NSIS, Inno, MSIX): pode rodar junto com a fila de MSI, que é um por vez.</param>
+public record OfflineInstaller(string Id, string File, string Kind, string? Args, IReadOnlyList<int> SuccessCodes, string? Signer = null, bool Parallel = false);
 
 /// <summary>
 /// Baixa os instaladores dos apps escolhidos enquanto a mídia é montada, para o primeiro login só instalar.
@@ -26,7 +27,7 @@ public static partial class OfflineInstallers
   private static readonly TimeSpan CacheLife = TimeSpan.FromDays(3);
 
   /// <summary>Muda quando a regra de escolha do instalador muda, para não reaproveitar o que foi baixado com a antiga.</summary>
-  private const string CacheVersion = "v3-machine";
+  private const string CacheVersion = "v4-paralelo";
 
   private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
@@ -72,6 +73,8 @@ public static partial class OfflineInstallers
     }));
     var list = apps.Where(a => ready.ContainsKey(a.Id)).Select(a => ready[a.Id]).ToList();
     await File.WriteAllTextAsync(Path.Combine(target, "offline.json"), JsonSerializer.Serialize(list, Json), ct);
+    // Data da mídia: pendrive guardado por semanas faz o primeiro login baixar as versões novas pela internet.
+    await File.WriteAllTextAsync(Path.Combine(target, "criado.txt"), DateTime.UtcNow.ToString("yyyy-MM-dd"), ct);
     return list;
   }
 
@@ -119,7 +122,7 @@ public static partial class OfflineInstallers
       string file = app.Id + Path.GetExtension(installer);
       File.Move(installer, Path.Combine(dir, file));
       File.Delete(manifest);
-      return new OfflineInstaller(app.Id, file, plan.Kind, plan.Args, plan.SuccessCodes);
+      return new OfflineInstaller(app.Id, file, plan.Kind, plan.Args, plan.SuccessCodes, Parallel: plan.Parallel);
     }
     return null;
   }
@@ -185,7 +188,7 @@ public static partial class OfflineInstallers
   /// Como o winget instalaria: tipo do instalador e opções silenciosas do manifesto, ou as padrão de cada tipo.
   /// Null quando não dá para instalar sem o winget (zip, portátil).
   /// </summary>
-  public static (string Kind, string? Args, IReadOnlyList<int> SuccessCodes)? ParseManifest(string yaml)
+  public static (string Kind, string? Args, IReadOnlyList<int> SuccessCodes, bool Parallel)? ParseManifest(string yaml)
   {
     string? type = Field(yaml, "InstallerType")?.ToLowerInvariant();
     string? silent = Field(yaml, "Silent");
@@ -204,7 +207,9 @@ public static partial class OfflineInstallers
     };
     if (plan is null) return null;
     string? args = string.Join(' ', new[] { plan.Value.Args, custom }.Where(s => !string.IsNullOrWhiteSpace(s)));
-    return (plan.Value.Kind, args.Length == 0 ? null : args, codes);
+    // "exe" genérico e burn ficam na fila de MSI: muitos chamam o msiexec por dentro (o VC++ AIO instala vários).
+    bool parallel = type is "nullsoft" or "inno" or "msix" or "appx";
+    return (plan.Value.Kind, args.Length == 0 ? null : args, codes, parallel);
   }
 
   private static string? Field(string yaml, string key)

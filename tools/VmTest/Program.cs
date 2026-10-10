@@ -185,7 +185,9 @@ try
   else
   {
     Log("Montando a mídia (preset padrão + apagar disco 0)");
-    await MediaBuilder.BuildAsync(esd, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+    var catalogForFeatures = AppCatalog.Load();
+    var features = catalogForFeatures.Resolve(catalogForFeatures.Defaults.Select(a => a.Id)).Where(a => a.Source == "feature").Select(a => a.Package).ToList();
+    await MediaBuilder.BuildAsync(esd, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")), features: features);
   }
   Log("Baixando os instaladores dos apps para a mídia");
   var appCatalog = AppCatalog.Load();

@@ -128,3 +128,16 @@ public class OfflineInstallerCrlfTests
     Assert.Equal([3010], plan.SuccessCodes);
   }
 }
+
+public class OfflineInstallerParallelTests
+{
+  [Theory]
+  [InlineData("nullsoft", true)]
+  [InlineData("inno", true)]
+  [InlineData("msix", true)]
+  [InlineData("wix", false)]
+  [InlineData("burn", false)]
+  [InlineData("exe", false)]
+  public void So_quem_nao_usa_o_Windows_Installer_roda_em_paralelo(string type, bool parallel) =>
+    Assert.Equal(parallel, OfflineInstallers.ParseManifest($"Installers:\n- InstallerType: {type}\n")!.Value.Parallel);
+}
