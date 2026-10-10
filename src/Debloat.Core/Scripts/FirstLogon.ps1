@@ -549,7 +549,7 @@ function Install-App($App) {
 		}
 		Write-Log 'apps.log' '  tentando pela internet'
 	}
-	if( $App.source -ne 'feature' ) { Initialize-Online }
+	if( $App.source -notin 'feature', 'link' ) { Initialize-Online }
 	$ok = $false
 	try {
 		switch( $App.source ) {
@@ -570,6 +570,13 @@ function Install-App($App) {
 				}
 				$ok = $code -in @( 0, -1978335189 )   # -1978335189 = já instalado
 				if( -not $ok -and $App.fallbackUrl ) { $ok = Install-FromVendor $App }
+			}
+			'link' {
+				# Sem instalador automático (NVIDIA App, AMD Adrenalin): atalho para o site oficial no Iniciar.
+				$file = $App.name -replace '[\/:*?"<>|]', ''
+				"[InternetShortcut]`r`nURL=$($App.package)" | Set-Content -LiteralPath "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\$file.url" -Encoding ASCII
+				Write-Log 'apps.log' "  atalho para o site: $($App.package)"
+				$ok = $true
 			}
 			'msstore' {
 				$ok = (Invoke-Winget @( 'install', '--exact', '--id', $App.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )) -in @( 0, -1978335189 )

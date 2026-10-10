@@ -10,6 +10,11 @@ namespace Debloat.Core.Presets;
 /// </summary>
 public record HardwareProfile(bool HasBattery, bool HasIrCamera, bool HasPenOrTouch)
 {
+  /// <summary>Placa de vídeo NVIDIA/AMD (marca o NVIDIA App/AMD Adrenalin na aba Apps).</summary>
+  public bool HasNvidiaGpu { get; init; }
+
+  public bool HasAmdGpu { get; init; }
+
   /// <summary>Desktop comum: sem bateria, sem câmera IR, sem caneta.</summary>
   public static HardwareProfile Desktop => new(false, false, false);
 
@@ -18,7 +23,11 @@ public record HardwareProfile(bool HasBattery, bool HasIrCamera, bool HasPenOrTo
     HasBattery: Any("SELECT * FROM Win32_Battery"),
     HasIrCamera: Any("SELECT Name FROM Win32_PnPEntity WHERE (PNPClass = 'Camera' OR PNPClass = 'Image') AND Name LIKE '%IR%'"),
     HasPenOrTouch: (GetSystemMetrics(SM_DIGITIZER) & NID_READY) != 0
-  );
+  )
+  {
+    HasNvidiaGpu = Any("SELECT * FROM Win32_VideoController WHERE PNPDeviceID LIKE '%VEN_10DE%'"),
+    HasAmdGpu = Any("SELECT * FROM Win32_VideoController WHERE PNPDeviceID LIKE '%VEN_1002%'"),
+  };
 
   [SupportedOSPlatform("windows")]
   private static bool Any(string query)

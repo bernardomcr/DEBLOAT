@@ -136,7 +136,7 @@
     {"id": "everything", "name": "Everything", "category": "utils", "source": "winget", "package": "voidtools.Everything", "default": true, "description": "Busca de arquivos instantânea."},
     {"id": "everything-toolbar", "name": "Everything Toolbar", "category": "utils", "source": "winget", "package": "srwi.EverythingToolbar.Launcher", "default": true, "requires": ["everything"], "description": "Coloca o Everything na barra de tarefas no lugar da busca do Windows."},
     {"id": "powertoys", "name": "PowerToys", "category": "utils", "source": "winget", "package": "Microsoft.PowerToys", "default": true},
-    {"id": "unigetui", "name": "UniGetUI", "category": "utils", "source": "winget", "package": "Devolutions.UniGetUI", "default": true, "description": "Mantém todos os apps atualizados."},
+    {"id": "unigetui", "name": "UniGetUI", "category": "utils", "source": "winget", "package": "Devolutions.UniGetUI", "default": true, "successCodes": [1], "description": "Mantém todos os apps atualizados."},
     {"id": "teracopy", "name": "TeraCopy", "category": "utils", "source": "winget", "package": "CodeSector.TeraCopy", "default": false},
     {"id": "wiztree", "name": "WizTree", "category": "utils", "source": "winget", "package": "AntibodySoftware.WizTree", "default": false, "description": "Mostra o que está ocupando o disco."},
     {"id": "revo", "name": "Revo Uninstaller", "category": "utils", "source": "winget", "package": "RevoUninstaller.RevoUninstaller", "default": false},
@@ -152,6 +152,8 @@
     {"id": "gpuz", "name": "GPU-Z", "category": "hardware", "source": "winget", "package": "TechPowerUp.GPU-Z", "default": false},
     {"id": "hwinfo", "name": "HWiNFO", "category": "hardware", "source": "winget", "package": "REALiX.HWiNFO", "default": false},
     {"id": "crystaldiskinfo", "name": "CrystalDiskInfo", "category": "hardware", "source": "winget", "package": "CrystalDewWorld.CrystalDiskInfo", "default": false},
+    {"id": "nvidia-app", "name": "NVIDIA App", "category": "hardware", "source": "link", "package": "https://www.nvidia.com/pt-br/software/nvidia-app/", "default": false, "gpu": "nvidia", "description": "Painel da NVIDIA (o driver vem pelo Windows Update); atalho para o site oficial."},
+    {"id": "amd-adrenalin", "name": "AMD Software: Adrenalin", "category": "hardware", "source": "link", "package": "https://www.amd.com/pt/support/download/drivers.html", "default": false, "gpu": "amd", "description": "Painel da AMD (o driver vem pelo Windows Update); atalho para o site oficial."},
     {"id": "afterburner", "name": "MSI Afterburner", "category": "hardware", "source": "winget", "package": "Guru3D.Afterburner", "default": false},
 
     {"id": "bitwarden", "name": "Bitwarden", "category": "security", "source": "winget", "package": "Bitwarden.Bitwarden", "default": false},

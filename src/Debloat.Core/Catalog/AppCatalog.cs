@@ -24,13 +24,15 @@ public record AppEntry(
   string? Asset = null,
   IReadOnlyList<string>? Requires = null,
   string? FallbackUrl = null,     // plano B: link oficial do fabricante, se o manifesto do winget estiver desatualizado
-  string? Signer = null           // o plano B só instala se a assinatura digital for deste fabricante
+  string? Signer = null,          // o plano B só instala se a assinatura digital for deste fabricante
+  IReadOnlyList<int>? SuccessCodes = null,  // códigos de saída que também são sucesso (UniGetUI sai com 1 instalando)
+  string? Gpu = null              // "nvidia"/"amd": vem marcado quando o PC tem essa placa de vídeo
 );
 
 /// <summary>Catálogo de apps e pré-requisitos (Data\apps.json).</summary>
 public sealed class AppCatalog
 {
-  public static readonly IReadOnlySet<string> KnownSources = new HashSet<string> { "winget", "msstore", "url", "github", "feature" };
+  public static readonly IReadOnlySet<string> KnownSources = new HashSet<string> { "winget", "msstore", "url", "github", "feature", "link" };
 
   private static readonly JsonSerializerOptions JsonOptions = new()
   {

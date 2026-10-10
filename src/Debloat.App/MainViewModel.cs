@@ -80,6 +80,34 @@ public partial class TweakGroup(string name, IEnumerable<TweakRow> rows) : Obser
 
 public record DnsOption(DnsChoice Value, string Label);
 
+/// <summary>
+/// Tempo que falta na cópia para o pendrive, pela velocidade medida. Pendrive USB 2.0 grava os ~10 GB em mais de uma
+/// hora (67 min no teste); USB 3.0 em poucos minutos — o aviso diz isso quando a cópia vai demorar.
+/// </summary>
+public sealed class CopyEta
+{
+  private DateTime? start;
+  private double startFraction;
+
+  public string Describe(WriteStep step)
+  {
+    if (!step.Text.StartsWith("Copiando", StringComparison.Ordinal)) return step.Text + "...";
+    var now = DateTime.Now;
+    if (start is null)
+    {
+      start = now;
+      startFraction = step.Fraction;
+      return step.Text + "...";
+    }
+    double done = step.Fraction - startFraction, elapsed = (now - start.Value).TotalSeconds;
+    if (done <= 0.01 || elapsed < 15) return step.Text + "...";
+    double remaining = elapsed / done * (0.95 - step.Fraction);   // a cópia vai até 95%
+    var left = TimeSpan.FromSeconds(Math.Max(0, remaining));
+    string text = left.TotalMinutes >= 1 ? $"{step.Text}: faltam ~{Math.Ceiling(left.TotalMinutes):F0} min" : $"{step.Text}: menos de 1 min";
+    return left.TotalMinutes > 20 ? text + " (pendrive lento, provavelmente USB 2.0; um USB 3.0 grava em poucos minutos)" : text;
+  }
+}
+
 /// <summary>Programa deste PC (aba Backup): pelo winget no Windows novo, ou levando a pasta.</summary>
 public partial class ProgramRow(InstalledProgram program) : ObservableObject
 {
@@ -126,6 +154,8 @@ public partial class MainViewModel : ObservableObject
     {
       foreach (var app in category.Apps)
       {
+        // Painel do fabricante da placa de vídeo deste PC já vem marcado.
+        if (app.Entry.Gpu == "nvidia" && hardware.HasNvidiaGpu || app.Entry.Gpu == "amd" && hardware.HasAmdGpu) app.IsSelected = true;
         app.PropertyChanged += (_, _) => { category.Refresh(); OnPropertyChanged(nameof(AppsSummary)); };
       }
     }
@@ -656,6 +686,7 @@ public partial class MainViewModel : ObservableObject
       Status = $"O backup marcado ({Size(BackupBytes)}) não cabe no pendrive ({Size(dataSpace)} livres para backup).";
       return;
     }
+    var copyEta = new CopyEta();
     await RunBusy(async () =>
     {
       await PrepareMediaAsync(60);
@@ -669,7 +700,7 @@ public partial class MainViewModel : ObservableObject
       Status = "Copiando drivers de rede, disco e chipset...";
       var drivers = await DriverExporter.ExportAsync(MediaDir);
       var (_, data) = await UsbWriter.WriteAsync(drive, MediaDir,
-        new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 38; Status = step.Text + "..."; }));
+        new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 38; Status = copyEta.Describe(step); }));
       var saves = Saves.Where(s => s.IsSelected).Select(s => s.Game).ToList();
       if (saves.Count > 0 && data is char d)
       {

@@ -27,7 +27,7 @@ public static partial class OfflineInstallers
   private static readonly TimeSpan CacheLife = TimeSpan.FromDays(3);
 
   /// <summary>Muda quando a regra de escolha do instalador muda, para não reaproveitar o que foi baixado com a antiga.</summary>
-  private const string CacheVersion = "v4-paralelo";
+  private const string CacheVersion = "v5-codigos";
 
   private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
@@ -122,7 +122,7 @@ public static partial class OfflineInstallers
       string file = app.Id + Path.GetExtension(installer);
       File.Move(installer, Path.Combine(dir, file));
       File.Delete(manifest);
-      return new OfflineInstaller(app.Id, file, plan.Kind, plan.Args, plan.SuccessCodes, Parallel: plan.Parallel);
+      return new OfflineInstaller(app.Id, file, plan.Kind, plan.Args, [.. plan.SuccessCodes, .. app.SuccessCodes ?? []], Parallel: plan.Parallel);
     }
     return null;
   }
@@ -181,7 +181,7 @@ public static partial class OfflineInstallers
       ".msix" or ".msixbundle" or ".appx" or ".appxbundle" => "msix",
       _ => "exe",
     };
-    return new OfflineInstaller(app.Id, file, kind, app.Args, []);
+    return new OfflineInstaller(app.Id, file, kind, app.Args, app.SuccessCodes ?? []);
   }
 
   /// <summary>
