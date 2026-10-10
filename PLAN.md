@@ -150,20 +150,27 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 
 ## Estado da V1 (10/10/2026)
 
-**Testado na VM (Hyper-V, Secure Boot + TPM):** pendrive/ISO do zero com o preset (sem perguntas, 53 apps em
-~7 min, nada trava, janelas de boas-vindas fechadas); modo sem pendrive de ponta a ponta; painel do primeiro
-login (aviso + lista); catálogo inteiro (147 apps) numa rodada — ver resultado abaixo.
-**Testado só no PC host (sem VM):** detecção de programas do backup; lista do painel com Abrir.
-**Não testado / conhecido:**
-- Builds do UUP dump (download + conversão) — marcado "em teste" no README.
-- Backup e restauração de um programa (winget ou pasta) de ponta a ponta.
-- Busca escondida pela política SearchOnTaskbarMode (entrou depois da última rodada).
-- "Introdução" ainda aparece nas recomendações do Iniciar.
-- Apps fora do preset podem abrir janelas sozinhos depois de instalar (Riot Client pede firewall, Playnite
-  abre a biblioteca) — prioridade baixa, a pedido do usuário.
-- Fixar no Iniciar: o Windows só oferece para alguns apps (Telegram, ShareX, VLC, Steam, WhatsApp sim;
-  Chrome, Firefox, Discord, PowerToys não) — o painel mostra o botão só onde funciona.
-- .NET 3.5 na imagem: o DISM do host não serviça o install.wim montado; segue no primeiro login, em paralelo.
+**Testado na VM (Hyper-V, Secure Boot + TPM):**
+- ISO do zero com o preset: sem perguntas além do disco, 53 apps em ~7 min, nada trava.
+- Painel do primeiro login: aviso + lista ("Seu PC está pronto.", Abrir e Fixar no Iniciar).
+- Modo sem pendrive de ponta a ponta, inclusive levando programas no backup (pasta do portátil + atalho no
+  Iniciar e CMake voltaram; partição apagada e C: devolvido).
+- Build pelo UUP dump: converte e instala. Neste PC o DISM não serviça imagem montada (erro 87), então a build
+  sai incompleta (base 26100.1, sem atualizações e sem App Installer/winget) — o app avisa e recomenda a versão
+  pronta da Microsoft. Continua "em teste" no README.
+- "Introdução" sumiu do Iniciar (PolicyManager + ambiente educacional); busca da barra escondida
+  (SearchOnTaskbarMode).
+- Catálogo inteiro: rodou até ~128/147 antes do disco de 80 GB da VM encher; o app agora só copia os
+  instaladores para o C: com folga.
+
+**Testado no PC host:** gravação do pendrive real (MBR, FAT32 ativa de 31 GB com boot UEFI/BIOS, NTFS
+DEBLOAT-DADOS, install.swm em 2 partes) — o Hyper-V não deixa dar boot por mídia removível, então o boot num
+PC físico fica para o usuário; detecção de programas do backup.
+
+**Sem teste (incluído a pedido):** Fixar no Iniciar pelo atalho (.lnk) quando a lista de apps não oferece.
+
+**Conhecido:** apps fora do preset podem abrir janelas sozinhos depois de instalar (Riot Client pede firewall,
+Playnite abre) — prioridade baixa; .NET 3.5 segue no primeiro login (em paralelo).
 
 ## Modo sem pendrive — testado na VM (10/10/2026)
 
