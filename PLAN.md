@@ -59,8 +59,8 @@ gravação contínua do Xbox desligada (Game Bar e captura de tela continuam); M
 otimizações para jogos em janela e HAGS ligados; Fast Startup desligado; hibernação desligada só
 no desktop; Localizar Dispositivo desligado só no desktop; propagandas internas (Scoobe, OneDrive
 no Explorer, Iniciar, tela de bloqueio); Edge sem sidebar/compras/recomendações; WPBT bloqueado;
-apps companheiros de hardware bloqueados; modo escuro; botões nunca agrupados; segundos no
-relógio; todos os ícones da bandeja; Este Computador e Lixeira na área de trabalho; "Recomendado"
+apps companheiros de hardware bloqueados; modo escuro; botões nunca agrupados; relógio sem
+segundos e bandeja com a setinha (^), a pedido do usuário; Este Computador e Lixeira na área de trabalho; "Recomendado"
 do Iniciar escondido; sudo do Windows; ponto de restauração "Instalação limpa DEBLOAT" no fim.
 
 **Nunca fazer (placebo ou perigoso):** desligar Defender, mitigações Spectre/Meltdown, paginação,

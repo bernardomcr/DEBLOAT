@@ -70,8 +70,8 @@ public static class TweakCatalog
     new("sem-visao-tarefas", "Barra de tarefas e Iniciar", "Sem botão Visão de Tarefas", "", true),
     new("finalizar-tarefa", "Barra de tarefas e Iniciar", "\"Finalizar tarefa\" no botão direito da barra", "", true),
     new("nunca-agrupar", "Barra de tarefas e Iniciar", "Nunca agrupar janelas na barra", "", true),
-    new("segundos-relogio", "Barra de tarefas e Iniciar", "Segundos no relógio", "", true),
-    new("todos-icones-bandeja", "Barra de tarefas e Iniciar", "Todos os ícones da bandeja visíveis", "", true),
+    new("segundos-relogio", "Barra de tarefas e Iniciar", "Segundos no relógio", "", false),
+    new("todos-icones-bandeja", "Barra de tarefas e Iniciar", "Todos os ícones da bandeja visíveis", "", false),
     new("modo-escuro", "Barra de tarefas e Iniciar", "Modo escuro", "", true),
 
     // Jogos
