@@ -133,9 +133,10 @@ public static partial class UupDump
   /// <summary>Conversor do pacote oficial do UUP dump: URLs e SHA-256 lidos do próprio pacote (não ficam fixos aqui).</summary>
   private static async Task<string> GetConverterAsync(HttpClient http, string uuid, string language, string workDir, CancellationToken ct)
   {
-    using var form = new FormUrlEncodedContent(new Dictionary<string, string> { ["autodl"] = "2", ["updates"] = "1", ["cleanup"] = "1" });
-    using var response = await http.PostAsync($"https://uupdump.net/get.php?id={uuid}&pack={language}&edition=professional", form, ct);
-    response.EnsureSuccessStatusCode();
+    using var response = await SendAsync(http, () => new HttpRequestMessage(HttpMethod.Post, $"https://uupdump.net/get.php?id={uuid}&pack={language}&edition=professional")
+    {
+      Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["autodl"] = "2", ["updates"] = "1", ["cleanup"] = "1" }),
+    }, ct);
     using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(ct));
     string list = new StreamReader(zip.GetEntry("files/converter_windows")!.Open()).ReadToEnd();
 
@@ -190,11 +191,34 @@ public static partial class UupDump
 
   private static async Task<string> GetAsync(HttpClient http, string url, CancellationToken ct)
   {
-    using var request = new HttpRequestMessage(HttpMethod.Get, url);
-    request.Headers.UserAgent.ParseAdd("DEBLOAT");
-    using var response = await http.SendAsync(request, ct);
-    response.EnsureSuccessStatusCode();
+    using var response = await SendAsync(http, () =>
+    {
+      var request = new HttpRequestMessage(HttpMethod.Get, url);
+      request.Headers.UserAgent.ParseAdd("DEBLOAT");
+      return request;
+    }, ct);
     return await response.Content.ReadAsStringAsync(ct);
+  }
+
+  /// <summary>
+  /// O UUP dump limita pedidos seguidos (429 Too Many Requests — no teste, a lista de arquivos logo depois do
+  /// conversor). Espera o que ele pedir (Retry-After) ou 5, 10, 15... s e tenta de novo, até 6 vezes.
+  /// </summary>
+  private static async Task<HttpResponseMessage> SendAsync(HttpClient http, Func<HttpRequestMessage> request, CancellationToken ct)
+  {
+    for (int attempt = 1; ; attempt++)
+    {
+      using var message = request();
+      var response = await http.SendAsync(message, ct);
+      if (response.StatusCode != System.Net.HttpStatusCode.TooManyRequests || attempt == 6)
+      {
+        response.EnsureSuccessStatusCode();
+        return response;
+      }
+      var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(5 * attempt);
+      response.Dispose();
+      await Task.Delay(wait < TimeSpan.FromMinutes(2) ? wait : TimeSpan.FromMinutes(2), ct);
+    }
   }
 
   [GeneratedRegex(@"version\s+(\d\d[Hh]\d)")]
