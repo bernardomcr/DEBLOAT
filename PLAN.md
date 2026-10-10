@@ -150,10 +150,12 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 
 ## Próximas tarefas combinadas (09/10/2026)
 
-1. **Aviso na tela no primeiro login**: janelinha no canto, "Instalando apps: 12 de 45 — Google Chrome",
-   que some no final. Na VM o usuário ficou ~10 min olhando a área de trabalho sem saber se estava rodando.
-2. **Fechar as janelas de boas-vindas** que os apps abrem ao terminar de instalar (Discord, Tailscale,
-   PowerToys...).
+1. ✅ **Aviso na tela no primeiro login** (10/10/2026): janelinha escura no canto inferior direito,
+   sempre por cima e sem roubar o foco ("Instalando apps: 12 de 48 — Google Chrome" + barra). Processo
+   separado que lê C:\Debloat\progresso.txt; fecha sozinho no fim ou se o script principal morrer.
+2. ✅ **Fechar as janelas de boas-vindas**: antes de cada app e 15 s depois do último, manda WM_CLOSE
+   (como clicar no X) às janelas de processos que não existiam no início do script. Apps de bandeja
+   continuam rodando. A conferir na rodada final da VM.
 3. ✅ **Instaladores na mídia** (10/10/2026): enquanto o Windows baixa, `OfflineInstallers` baixa os
    instaladores (4 em paralelo; `winget download` com hash conferido + opções silenciosas do manifesto;
    GitHub/URL direto; Wand pelo plano B com assinatura conferida no primeiro login) para `DEBLOAT\apps`

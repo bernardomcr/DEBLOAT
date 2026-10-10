@@ -20,6 +20,87 @@ function Write-Log([string] $File, [string] $Text) {
 	}
 }
 
+# --- Aviso no canto da tela: o usuário vê que ainda está instalando (na VM ficou ~10 min sem sinal nenhum) ---
+$progressFile = Join-Path $root 'progresso.txt'
+$noticeScript = Join-Path $root 'aviso.ps1'
+@'
+param( [string] $Status, [int] $Parent )
+Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+$form = New-Object System.Windows.Forms.Form
+$form.FormBorderStyle = 'None'
+$form.ShowInTaskbar = $false
+$form.TopMost = $true
+$form.BackColor = [System.Drawing.Color]::FromArgb( 32, 32, 32 )
+$form.AutoScaleMode = 'Dpi'
+$form.ClientSize = New-Object System.Drawing.Size( 380, 92 )
+$form.StartPosition = 'Manual'
+$area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$form.Location = New-Object System.Drawing.Point( ($area.Right - $form.Width - 16), ($area.Bottom - $form.Height - 16) )
+$title = New-Object System.Windows.Forms.Label
+$title.SetBounds( 16, 12, 348, 24 )
+$title.ForeColor = [System.Drawing.Color]::White
+$title.Font = New-Object System.Drawing.Font( 'Segoe UI Semibold', 11 )
+$title.Text = 'Preparando o Windows'
+$detail = New-Object System.Windows.Forms.Label
+$detail.SetBounds( 16, 38, 348, 20 )
+$detail.ForeColor = [System.Drawing.Color]::FromArgb( 190, 190, 190 )
+$detail.Font = New-Object System.Drawing.Font( 'Segoe UI', 9 )
+$detail.AutoEllipsis = $true
+$track = New-Object System.Windows.Forms.Panel
+$track.SetBounds( 16, 70, 348, 4 )
+$track.BackColor = [System.Drawing.Color]::FromArgb( 64, 64, 64 )
+$bar = New-Object System.Windows.Forms.Panel
+$bar.SetBounds( 0, 0, 0, 4 )
+$bar.BackColor = [System.Drawing.Color]::FromArgb( 76, 194, 255 )
+$track.Controls.Add( $bar )
+$form.Controls.AddRange( @( $title, $detail, $track ) )
+# Aberto com janela oculta, o Windows esconderia o aviso também: mostra sem tirar o foco de quem estiver usando.
+Add-Type -Namespace Debloat -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);'
+$form.Add_Shown( { [Debloat.Win]::ShowWindow( $form.Handle, 4 ) | Out-Null } )
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 700
+$timer.Add_Tick( {
+	# Fecha sozinho se o script principal morrer: o aviso nunca fica preso na tela.
+	if( -not (Get-Process -Id $Parent -ErrorAction SilentlyContinue) ) { $form.Close(); return }
+	try {
+		$lines = [System.IO.File]::ReadAllLines( $Status )
+		if( $lines[0] -eq 'FIM' ) { $form.Close(); return }
+		$title.Text = $lines[0]
+		$detail.Text = $lines[1]
+		$bar.Width = [int] ($track.Width * [Math]::Min( 100, [int] $lines[2] ) / 100)
+	} catch { }
+} )
+$timer.Start()
+[System.Windows.Forms.Application]::Run( $form )
+'@ | Set-Content -LiteralPath $noticeScript -Encoding UTF8
+
+function Set-Notice([string] $Title, [string] $Detail = '', [int] $Percent = 0) {
+	foreach( $try in 1..5 ) {
+		try {
+			[System.IO.File]::WriteAllLines( $progressFile, [string[]] @( $Title, $Detail, $Percent ) )
+			return
+		} catch {
+			Start-Sleep -Milliseconds 100
+		}
+	}
+}
+
+Set-Notice 'Preparando o Windows' 'Ajustes finais'
+Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$noticeScript`" -Status `"$progressFile`" -Parent $PID"
+
+# --- Janelas de boas-vindas: o que os instaladores abrem sozinhos (Discord, Tailscale, PowerToys...) ---
+$keepWindows = @( 'explorer', 'powershell', 'pwsh', 'conhost', 'WindowsTerminal', 'SystemSettings', 'TextInputHost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LockApp' )
+$baseline = @( Get-Process | ForEach-Object Id )
+
+function Close-NewWindows {
+	# WM_CLOSE (como clicar no X): apps de bandeja continuam rodando, só a janela some.
+	Get-Process | Where-Object { $_.Id -notin $baseline -and $_.MainWindowHandle -ne 0 -and $_.ProcessName -notin $keepWindows } | ForEach-Object {
+		Write-Log 'apps.log' "  fechando janela: $($_.ProcessName) — $($_.MainWindowTitle)"
+		$_.CloseMainWindow() | Out-Null
+	}
+}
+
 #region tweak:servicos-telemetria
 foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
 	Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
@@ -246,7 +327,11 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 }
 
 if( $apps.Count -gt 0 ) {
+	$index = 0
 	foreach( $app in $apps ) {
+		Close-NewWindows   # o que o app anterior abriu
+		$index++
+		Set-Notice "Instalando apps: $index de $($apps.Count)" $app.name ([int] (100 * ($index - 1) / $apps.Count))
 		Write-Log 'apps.log' "Instalando $($app.name)..."
 		if( $offline.ContainsKey( $app.id ) ) {
 			try {
@@ -307,6 +392,12 @@ if( $apps.Count -gt 0 ) {
 }
 
 Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
+if( $apps.Count -gt 0 ) {
+	# Alguns abrem a janela só depois de se atualizarem (o Discord leva uns segundos).
+	Set-Notice 'Finalizando' 'Fechando as janelas de boas-vindas' 100
+	Start-Sleep -Seconds 15
+	Close-NewWindows
+}
 Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
 #region tweak:sudo
@@ -315,7 +406,12 @@ if( Get-Command sudo.exe -ErrorAction SilentlyContinue ) { sudo.exe config --ena
 
 #region tweak:ponto-restauracao
 # Depois que tudo foi instalado: é o "voltar ao zero" sem formatar.
+Set-Notice 'Finalizando' 'Criando o ponto de restauração' 100
 Enable-ComputerRestore -Drive "$env:SystemDrive\" -ErrorAction SilentlyContinue
 reg.exe add 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' /v SystemRestorePointCreationFrequency /t REG_DWORD /d 0 /f | Out-Null
 Checkpoint-Computer -Description 'Instalação limpa DEBLOAT' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue
 #endregion
+
+Set-Notice 'Pronto' 'O Windows está configurado' 100
+Start-Sleep -Seconds 6
+Set-Notice 'FIM'
