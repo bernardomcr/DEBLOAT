@@ -13,6 +13,20 @@ using Microsoft.Win32;
 
 namespace Debloat.App;
 
+/// <summary>Uma linha da janela de preparo: o Windows ou um instalador.</summary>
+public partial class PrepItem(string id, string name) : ObservableObject
+{
+  public string Id { get; } = id;
+
+  public string Name { get; } = name;
+
+  [ObservableProperty]
+  private string state = "Aguardando";
+
+  [ObservableProperty]
+  private bool done;
+}
+
 public partial class AppItem(AppEntry entry) : ObservableObject
 {
   public AppEntry Entry { get; } = entry;
@@ -330,11 +344,47 @@ public partial class MainViewModel : ObservableObject
     Status = "Windows baixado.";
   }
 
-  /// <summary>Monta a pasta de instalação com o preset (de .esd ou da pasta convertida).</summary>
+  public ObservableCollection<PrepItem> PrepItems { get; } = [];
+
+  /// <summary>A janela abre a lista do que está sendo baixado.</summary>
+  public event Action? PreparationStarted;
+
+  /// <summary>
+  /// Monta a pasta de instalação com o preset (de .esd ou da pasta convertida). Enquanto o Windows baixa,
+  /// os instaladores dos apps também baixam e vão para DEBLOAT\apps na mídia.
+  /// </summary>
   private async Task PrepareMediaAsync(double share)
   {
-    await EnsureWindowsAsync();
-    byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
+    var options = BuildOptions();
+    var apps = catalog.Resolve(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id));
+    PrepItems.Clear();
+    var windows = new PrepItem("windows", SelectedBuild is { } b ? $"Windows 11 {SelectedVersion?.Label} ({b.Build})" : "Windows 11");
+    PrepItems.Add(windows);
+    foreach (var app in apps) PrepItems.Add(new PrepItem(app.Id, app.Name));
+    PreparationStarted?.Invoke();
+
+    string staging = Path.Combine(DataDir, "cache", "midia-apps");
+    if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+    var installers = OfflineInstallers.PrepareAsync(Http, apps, Path.Combine(DataDir, "cache", "apps"), staging,
+      new Progress<OfflineProgress>(p =>
+      {
+        if (PrepItems.FirstOrDefault(i => i.Id == p.Id) is not { } item) return;
+        item.State = p.State switch
+        {
+          OfflineState.Downloading => "Baixando...",
+          OfflineState.Ready => Size(p.Bytes),
+          _ => "Na instalação, pela internet",
+        };
+        item.Done = p.State is OfflineState.Ready or OfflineState.Online;
+      }));
+
+    windows.State = "Baixando...";
+    var windowsTask = EnsureWindowsAsync();
+    await Task.WhenAll(windowsTask, installers);
+    windows.State = "Pronto";
+    windows.Done = true;
+
+    byte[] xml = new UnattendBuilder(catalog).BuildBytes(options);
     var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * share; Status = step.Text + "..."; });
     if (preparedFolder is not null)
     {
@@ -344,6 +394,17 @@ public partial class MainViewModel : ObservableObject
     {
       await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
     }
+
+    Status = "Pondo os instaladores na mídia...";
+    await Task.Run(() =>
+    {
+      foreach (string file in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories))
+      {
+        string dest = Path.Combine(MediaDir, Path.GetRelativePath(staging, file));
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        File.Copy(file, dest, overwrite: true);
+      }
+    });
   }
 
   [RelayCommand]
@@ -497,6 +558,13 @@ public partial class MainViewModel : ObservableObject
     await RunBusy(async () =>
     {
       await PrepareMediaAsync(60);
+      string installers = Path.Combine(MediaDir, OfflineInstallers.MediaFolder);
+      long mediaSize = Directory.EnumerateFiles(MediaDir, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
+      if (mediaSize > UsbWriter.BootPartitionSize(drive.Size) - (512L << 20) && Directory.Exists(installers))
+      {
+        Directory.Delete(installers, recursive: true);   // pendrive pequeno: os apps baixam no primeiro login, como antes
+        foreach (var item in PrepItems.Where(i => i.Id != "windows")) item.State = "Na instalação, pela internet";
+      }
       Status = "Copiando drivers de rede, disco e chipset...";
       var drivers = await DriverExporter.ExportAsync(MediaDir);
       var (_, data) = await UsbWriter.WriteAsync(drive, MediaDir,

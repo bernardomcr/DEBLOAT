@@ -164,8 +164,10 @@ function Get-File([string] $Url, [string] $Path) {
 function Install-Downloaded([string] $File, [string] $Arguments) {
 	if( $File -like '*.msi' ) {
 		$p = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$File`" $Arguments" -Wait -PassThru
-	} else {
+	} elseif( $Arguments ) {
 		$p = Start-Process -FilePath $File -ArgumentList $Arguments -Wait -PassThru
+	} else {
+		$p = Start-Process -FilePath $File -Wait -PassThru
 	}
 	Write-Log 'apps.log' "  instalador saiu com $($p.ExitCode)"
 	Remove-Item -LiteralPath $File -ErrorAction SilentlyContinue
@@ -187,6 +189,35 @@ function Install-FromVendor($App) {
 	Install-Downloaded $file $App.args | Out-Null
 }
 
+function Install-Offline($Item) {
+	# Instalador que veio na mídia (baixado quando o DEBLOAT montou o pendrive/ISO).
+	$file = Join-Path $offlineDir $Item.file
+	if( $Item.signer ) {
+		$sig = Get-AuthenticodeSignature -LiteralPath $file
+		if( $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike "*$($Item.signer)*" ) {
+			Write-Log 'apps.log' "  instalador da mídia recusado: assinatura $($sig.Status)"
+			return $false
+		}
+	}
+	if( $Item.kind -eq 'msix' ) {
+		Add-AppxPackage -Path $file -ErrorAction Stop
+		Write-Log 'apps.log' '  instalado da mídia'
+		Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+		return $true
+	}
+	$code = Install-Downloaded $file $Item.args
+	return $code -in (@( 0, 1641, 3010 ) + @( $Item.successCodes ))
+}
+
+function Initialize-Online {
+	# Só espera internet e winget se algum app não veio na mídia.
+	if( $script:onlineReady ) { return }
+	$script:onlineReady = $true
+	if( -not (Wait-Internet) ) { Write-Log 'apps.log' 'Sem internet: apps que não vieram na mídia não foram instalados. Rode C:\Debloat\reinstalar-apps.ps1 depois.' }
+	$script:winget = Get-Winget
+	if( -not $script:winget ) { Write-Log 'apps.log' 'winget não apareceu em 5 minutos; apps do winget/Loja vão falhar.' }
+}
+
 function Enable-FromMedia([string] $Feature) {
 	# Recursos como o .NET 3.5 vêm da pasta sources\sxs do pendrive, sem internet.
 	foreach( $drive in [System.IO.DriveInfo]::GetDrives() ) {
@@ -199,12 +230,33 @@ function Enable-FromMedia([string] $Feature) {
 	Enable-WindowsOptionalFeature -Online -FeatureName $Feature -NoRestart -All -ErrorAction Stop | Out-Null
 }
 
+# Instaladores que o DEBLOAT já pôs no pendrive/ISO. Copia antes: o pendrive pode ser tirado no meio.
+$offline = @{}
+$offlineDir = "$env:SystemDrive\Debloat\instaladores"
+$onlineReady = $false
+$winget = $null
+foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
+	$source = Join-Path $drive.RootDirectory 'DEBLOAT\apps'
+	if( Test-Path -LiteralPath "$source\offline.json" ) {
+		robocopy.exe $source $offlineDir /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+		foreach( $item in (Get-Content -LiteralPath "$offlineDir\offline.json" -Raw | ConvertFrom-Json) ) { $offline[$item.id] = $item }
+		Write-Log 'apps.log' "$($offline.Count) instaladores vieram na mídia ($($drive.Name))"
+		break
+	}
+}
+
 if( $apps.Count -gt 0 ) {
-	if( -not (Wait-Internet) ) { Write-Log 'apps.log' 'Sem internet: apps não instalados. Rode C:\Debloat\reinstalar-apps.ps1 depois.' }
-	$winget = Get-Winget
-	if( -not $winget ) { Write-Log 'apps.log' 'winget não apareceu em 5 minutos; apps do winget/Loja vão falhar.' }
 	foreach( $app in $apps ) {
 		Write-Log 'apps.log' "Instalando $($app.name)..."
+		if( $offline.ContainsKey( $app.id ) ) {
+			try {
+				if( Install-Offline $offline[$app.id] ) { continue }
+			} catch {
+				Write-Log 'apps.log' "  ERRO na mídia: $_"
+			}
+			Write-Log 'apps.log' '  tentando pela internet'
+		}
+		Initialize-Online
 		try {
 			switch( $app.source ) {
 				'feature' {
@@ -254,6 +306,7 @@ if( $apps.Count -gt 0 ) {
 	}
 }
 
+Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
 #region tweak:sudo

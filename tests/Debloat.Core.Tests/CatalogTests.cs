@@ -68,3 +68,63 @@ public class FallbackTests
     }
   }
 }
+
+public class OfflineInstallerTests
+{
+  [Fact]
+  public void Burn_usa_a_opcao_silenciosa_e_os_codigos_de_sucesso_do_manifesto()
+  {
+    const string yaml = """
+      PackageIdentifier: Microsoft.VCRedist.2015+.x86
+      Installers:
+      - Architecture: x86
+        InstallerType: burn
+        InstallerSwitches:
+          Silent: /quiet /norestart
+          SilentWithProgress: /passive /norestart
+        InstallerSuccessCodes:
+        - 3010
+        - 1638
+      ManifestType: merged
+      """;
+    var plan = OfflineInstallers.ParseManifest(yaml)!.Value;
+    Assert.Equal("exe", plan.Kind);
+    Assert.Equal("/quiet /norestart", plan.Args);
+    Assert.Equal([3010, 1638], plan.SuccessCodes);
+  }
+
+  [Theory]
+  [InlineData("wix", "msi", "/qn /norestart")]
+  [InlineData("nullsoft", "exe", "/S")]
+  [InlineData("inno", "exe", "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-")]
+  [InlineData("msix", "msix", null)]
+  public void Sem_opcao_no_manifesto_usa_a_padrao_do_tipo(string type, string kind, string? args)
+  {
+    var plan = OfflineInstallers.ParseManifest($"Installers:\n- Architecture: x64\n  InstallerType: {type}\n")!.Value;
+    Assert.Equal(kind, plan.Kind);
+    Assert.Equal(args, plan.Args);
+  }
+
+  [Fact]
+  public void Custom_e_somado_e_SilentWithProgress_nao_conta_como_Silent()
+  {
+    var plan = OfflineInstallers.ParseManifest("Installers:\n- InstallerType: inno\n  InstallerSwitches:\n    SilentWithProgress: /SILENT\n    Custom: '/MERGETASKS=!runcode'\n")!.Value;
+    Assert.Equal("/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /MERGETASKS=!runcode", plan.Args);
+  }
+
+  [Theory]
+  [InlineData("Installers:\n- InstallerType: zip\n  NestedInstallerType: portable\n")]
+  [InlineData("Installers:\n- InstallerType: portable\n")]
+  public void Sem_jeito_de_instalar_sozinho_fica_pela_internet(string yaml) => Assert.Null(OfflineInstallers.ParseManifest(yaml));
+}
+
+public class OfflineInstallerCrlfTests
+{
+  [Fact]
+  public void Manifesto_com_CRLF_como_o_winget_grava()
+  {
+    var plan = OfflineInstallers.ParseManifest("Installers:\r\n- Architecture: x64\r\n  InstallerType: wix\r\n  InstallerSuccessCodes:\r\n  - 3010\r\n")!.Value;
+    Assert.Equal("msi", plan.Kind);
+    Assert.Equal([3010], plan.SuccessCodes);
+  }
+}

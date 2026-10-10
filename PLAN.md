@@ -154,9 +154,14 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    que some no final. Na VM o usuário ficou ~10 min olhando a área de trabalho sem saber se estava rodando.
 2. **Fechar as janelas de boas-vindas** que os apps abrem ao terminar de instalar (Discord, Tailscale,
    PowerToys...).
-3. **Downloads em paralelo** no início do primeiro login (instalação continua em fila: o Windows Installer
-   só aceita um por vez) e, depois, **instaladores em cache no pendrive**. Medido na VM: lista inteira
-   ~15–20 min, sendo ~5 min só do .NET 3.5.
+3. ✅ **Instaladores na mídia** (10/10/2026): enquanto o Windows baixa, `OfflineInstallers` baixa os
+   instaladores (4 em paralelo; `winget download` com hash conferido + opções silenciosas do manifesto;
+   GitHub/URL direto; Wand pelo plano B com assinatura conferida no primeiro login) para `DEBLOATpps`
+   na ISO/pendrive, com a janela "Preparando" listando cada um. O primeiro login copia para
+   `C:\Debloat\instaladores`, instala de lá e só usa internet/winget para o que faltar ou falhar.
+   Medido no preset: 48 de 53 na mídia, 3,3 GB, 1,3 min. Ficam pela internet: Loja (WhatsApp, ChatGPT —
+   exige conta Entra), .NET 3.5 (vem do sources\sxs), GameInput e OpenAL (sem instalador direto).
+   Pendrive pequeno demais → os instaladores saem da mídia e tudo volta a baixar no primeiro login.
 4. **Rodada completa final na VM** antes de usar num PC de verdade, conferindo também o Wand pelo plano B
    (curl + assinatura "WeMod LLC") e o RustDesk (GitHub).
 5. VM: parar de recriar tudo a cada ajuste — checkpoint do Hyper-V logo após a instalação e testar só o

@@ -6,11 +6,18 @@ namespace Debloat.App;
 public partial class MainWindow : FluentWindow
 {
   private readonly MainViewModel vm = new();
+  private PrepWindow? prep;
 
   public MainWindow()
   {
     DataContext = vm;
     InitializeComponent();
+    vm.PreparationStarted += () =>
+    {
+      if (prep is { IsVisible: true }) return;
+      prep = new PrepWindow(vm) { Owner = this };
+      prep.Show();
+    };
     Loaded += async (_, _) =>
     {
       await Task.WhenAll(vm.LoadReleasesAsync(), vm.RefreshUsbCommand.ExecuteAsync(null), vm.LoadMigrationAsync());
