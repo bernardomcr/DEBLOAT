@@ -45,6 +45,8 @@ public static partial class InPlaceInstaller
       progress?.Report(new("Copiando drivers de rede, disco e chipset", 0.01));
       await DriverExporter.ExportAsync(mediaDir, ct);
     }
+    // Sobras de uma tentativa anterior (partição, entrada de boot) saem antes de medir o espaço livre.
+    await UndoAsync(ct);
     var plan = await CheckAsync(mediaDir, ct);
     if (!plan.Uefi) throw new InvalidOperationException("O modo sem pendrive só funciona em PCs com UEFI. Use o pendrive.");
     // Com o disco criptografado o WinPE não lê o C: (não acharia o Windows antigo). Melhor avisar agora.
@@ -57,14 +59,6 @@ public static partial class InPlaceInstaller
     await File.WriteAllTextAsync(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory)!, "DEBLOAT-ALVO.txt"), token, ct);
     char s = (await PowerShell.RunAsync($$"""
       $c = Get-Partition -DriveLetter $env:SystemDrive[0]
-      # Sobra de uma tentativa anterior: apaga e devolve o espaço ao C: antes de encolher de novo.
-      $old = Get-Volume -FileSystemLabel '{{SetupLabel}}' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue | Where-Object DiskNumber -eq $c.DiskNumber
-      if( $old ) {
-        $old | Remove-Partition -Confirm:$false
-        $max = ($c | Get-PartitionSupportedSize).SizeMax
-        if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max }
-        $c = Get-Partition -DriveLetter $env:SystemDrive[0]
-      }
       # 64 MB de folga: com o alinhamento do disco, o espaço livre sai um pouco menor que o encolhido.
       $c | Resize-Partition -Size ($c.Size - {{plan.PartitionSize}} - 64MB)
       $p = $null
@@ -112,11 +106,15 @@ public static partial class InPlaceInstaller
     await DeleteBootEntriesAsync(ct);
     await PowerShell.RunAsync($$"""
       $c = Get-Partition -DriveLetter $env:SystemDrive[0]
-      Get-Volume -FileSystemLabel '{{SetupLabel}}' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue |
-        Where-Object DiskNumber -eq $c.DiskNumber | Remove-Partition -Confirm:$false
-      $c = Get-Partition -DriveLetter $env:SystemDrive[0]
-      $max = ($c | Get-PartitionSupportedSize).SizeMax
-      if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max }
+      $old = @( Get-Volume -FileSystemLabel '{{SetupLabel}}' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue |
+        Where-Object DiskNumber -eq $c.DiskNumber )
+      if( $old.Count -gt 0 ) {
+        $old | Remove-Partition -Confirm:$false
+        # Só devolve espaço quando havia a partição nossa: espaço livre deixado pelo usuário não é tocado.
+        $c = Get-Partition -DriveLetter $env:SystemDrive[0]
+        $max = ($c | Get-PartitionSupportedSize).SizeMax
+        if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max }
+      }
       Remove-Item -LiteralPath "$env:SystemDrive\DEBLOAT-ALVO.txt" -ErrorAction SilentlyContinue
       """, ct);
   }
