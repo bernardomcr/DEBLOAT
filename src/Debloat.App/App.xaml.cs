@@ -23,6 +23,19 @@ public partial class App : Application
     Brand.Apply(ApplicationThemeManager.GetAppTheme());
     base.OnStartup(e);
 
+    if (e.Args.Length >= 2 && e.Args[0] == "--ajustes")
+    {
+      // Atalho "DEBLOAT - Ajustes" do Windows instalado: desfazer ajuste por ajuste.
+      var tweaks = new TweaksWindow(new TweaksViewModel(e.Args[1]));
+      tweaks.Show();
+#if DEBUG
+      if (Environment.GetEnvironmentVariable("DEBLOAT_PRINTS") is { Length: > 0 } tweakPrints)
+      {
+        tweaks.Dispatcher.InvokeAsync(() => { Prints.Save(tweaks, System.IO.Path.Combine(tweakPrints, "ajustes.png")); Shutdown(); }, DispatcherPriority.ApplicationIdle);
+      }
+#endif
+      return;
+    }
     if (e.Args.Length >= 2 && e.Args[0] == "--painel")
     {
       // --abrir: já abre a lista (o teste na VM não tem como clicar no aviso).

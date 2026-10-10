@@ -82,3 +82,21 @@ public class EveryTweakDoesSomethingTests
     }
   }
 }
+
+public class TweakUndoTests
+{
+  [Fact]
+  public void Preset_gera_desfazer_de_registro()
+  {
+    var entries = Debloat.Core.Presets.TweakUndo.Build(Debloat.Core.Presets.TweakCatalog.DefaultsFor(Debloat.Core.Presets.HardwareProfile.Desktop));
+    Assert.True(entries.Count >= 15, $"só {entries.Count} ajustes com desfazer");
+    foreach (var e in entries)
+    {
+      Assert.NotEmpty(e.Commands);
+      Assert.All(e.Commands, c => Assert.Matches(@"^delete ""HK(LM|CU)\\[^""$]+"" /v ""[^""]+"" /f$", c));
+    }
+    var recommended = entries.Single(e => e.Id == "recomendado-iniciar");
+    Assert.Contains(@"delete ""HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer"" /v ""HideRecommendedSection"" /f", recommended.Commands);
+    Assert.Contains(recommended.Commands, c => c.StartsWith(@"delete ""HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced""", StringComparison.Ordinal));
+  }
+}

@@ -147,8 +147,18 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 		break
 	}
 }
+# Como desfazer cada ajuste (gerado dos blocos dos scripts): o DEBLOAT abre a lista pelo atalho "DEBLOAT - Ajustes".
+$tweakUndo = @'
+@@AJUSTES@@
+'@
+$tweakUndoFile = Join-Path $root 'ajustes.json'
+[System.IO.File]::WriteAllText( $tweakUndoFile, $tweakUndo, (New-Object System.Text.UTF8Encoding $false) )
 if( $panel ) {
 	Start-Process -FilePath $panel -ArgumentList "--painel `"$stateFile`" $PID"
+	$link = (New-Object -ComObject WScript.Shell).CreateShortcut( "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\DEBLOAT - Ajustes.lnk" )
+	$link.TargetPath = $panel
+	$link.Arguments = "--ajustes `"$tweakUndoFile`""
+	$link.Save()
 } else {
 	Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$noticeScript`" -Status `"$progressFile`" -Parent $PID"
 }

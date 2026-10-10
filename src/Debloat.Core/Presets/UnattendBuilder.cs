@@ -154,7 +154,8 @@ public sealed class UnattendBuilder
     }
     string firstLogon = ScriptRegions.Apply(Resources.Script("FirstLogon.ps1"), tweaks, named)
       .Replace("@@DNS@@", DnsToken(options.Dns))
-      .Replace("@@APPS@@", AppCatalog.ToScriptJson(apps));
+      .Replace("@@APPS@@", AppCatalog.ToScriptJson(apps))
+      .Replace("@@AJUSTES@@", TweakUndo.ToJson(TweakUndo.Build(tweaks)));
     scripts.Add(new(firstLogon, ScriptPhase.FirstLogon, ScriptType.Ps1));
     return scripts;
   }
