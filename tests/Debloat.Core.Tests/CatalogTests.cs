@@ -141,3 +141,15 @@ public class OfflineInstallerParallelTests
   public void So_quem_nao_usa_o_Windows_Installer_roda_em_paralelo(string type, bool parallel) =>
     Assert.Equal(parallel, OfflineInstallers.ParseManifest($"Installers:\n- InstallerType: {type}\n")!.Value.Parallel);
 }
+
+public class UpdatesTests
+{
+  [Theory]
+  [InlineData("v1.0.1", true)]
+  [InlineData("v1.1.0", true)]
+  [InlineData("v1.0.0", false)]
+  [InlineData("v0.9.0", false)]
+  [InlineData("lixo", false)]
+  public void Avisa_so_quando_a_release_e_mais_nova(string tag, bool newer) =>
+    Assert.Equal(newer, Debloat.Core.Updates.Parse(tag, "https://github.com/x", new Version(1, 0, 0, 0)) is not null);
+}

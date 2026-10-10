@@ -27,7 +27,7 @@ public partial class MainWindow : FluentWindow
         _ = SavePrintsAsync(prints);
       }
 #endif
-      await Task.WhenAll(vm.LoadReleasesAsync(), vm.RefreshUsbCommand.ExecuteAsync(null), vm.LoadMigrationAsync());
+      await Task.WhenAll(vm.LoadReleasesAsync(), vm.RefreshUsbCommand.ExecuteAsync(null), vm.LoadMigrationAsync(), vm.CheckUpdateAsync());
     };
   }
 

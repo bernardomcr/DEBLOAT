@@ -2,12 +2,14 @@
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:local="clr-namespace:Debloat.App"
                  Title="DEBLOAT!" Width="1040" Height="720" MinWidth="880" MinHeight="640"
                  WindowStartupLocation="CenterScreen" Icon="Assets/DEBLOAT.ico"
                  Background="{DynamicResource DebloatBackground}" FontFamily="{StaticResource DebloatFont}"
                  ExtendsContentIntoTitleBar="True" WindowBackdropType="None" WindowCornerPreference="Round">
   <ui:FluentWindow.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <local:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
   </ui:FluentWindow.Resources>
 
   <Grid>
@@ -23,6 +25,14 @@
       </ui:TitleBar.Icon>
     </ui:TitleBar>
 
+    <Border Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,8,24,0" Panel.ZIndex="1" Padding="12,6"
+            CornerRadius="6" Background="{DynamicResource DebloatAccentSoft}"
+            Visibility="{Binding UpdateText, Converter={StaticResource NotNullToVisibility}}">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="{Binding UpdateText}" VerticalAlignment="Center" Foreground="{DynamicResource DebloatText}" Margin="0,0,12,0" />
+        <ui:Button Content="Baixar" Appearance="Primary" Command="{Binding OpenUpdateCommand}" Padding="10,4" />
+      </StackPanel>
+    </Border>
     <TabControl x:Name="Tabs" Grid.Row="1" Style="{StaticResource DebloatTabs}" ItemContainerStyle="{StaticResource DebloatTab}">
 
       <!-- WINDOWS -->

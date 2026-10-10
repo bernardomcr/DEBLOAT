@@ -261,6 +261,27 @@ public partial class MainViewModel : ObservableObject
   };
 
   /// <summary>Ao abrir: primeiro as prontas da Microsoft (rápido, já dá para baixar), depois todas as builds do UUP dump.</summary>
+  // --- Atualização do DEBLOAT ---
+
+  [ObservableProperty] private string? updateText;
+  private string? updateUrl;
+
+  public async Task CheckUpdateAsync()
+  {
+    var current = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0);
+    if (await Debloat.Core.Updates.CheckAsync(Http, current) is { } release)
+    {
+      updateUrl = release.Url;
+      UpdateText = $"DEBLOAT! {release.Version.ToString(3)} disponível";
+    }
+  }
+
+  [RelayCommand]
+  private void OpenUpdate()
+  {
+    if (updateUrl is not null) Process.Start(new ProcessStartInfo(updateUrl) { UseShellExecute = true });
+  }
+
   public async Task LoadReleasesAsync()
   {
     try
