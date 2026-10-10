@@ -93,3 +93,21 @@ public class WipeDiskTests
     Assert.Contains("install.swm", wipe);
   }
 }
+
+public class LanguageTests
+{
+  [Theory]
+  [InlineData("pt-br", "pt-BR")]
+  [InlineData("en-us", "en-US")]
+  [InlineData("sr-latn-rs", "sr-Latn-RS")]
+  public void Codigo_do_catalogo_vira_codigo_do_gerador(string catalog, string generator) =>
+    Assert.Equal(generator, UnattendBuilder.LanguageId(catalog));
+
+  [Fact]
+  public void Imagem_em_ingles_com_formatos_brasileiros_gera_xml()
+  {
+    string xml = System.Text.Encoding.UTF8.GetString(new UnattendBuilder().BuildBytes(new DebloatOptions { Language = "en-us" }));
+    Assert.Contains("<UILanguage>en-US</UILanguage>", xml);
+    Assert.Contains("<UserLocale>pt-BR</UserLocale>", xml);
+  }
+}

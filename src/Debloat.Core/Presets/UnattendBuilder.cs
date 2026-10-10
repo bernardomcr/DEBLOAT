@@ -160,7 +160,12 @@ public sealed class UnattendBuilder
   public static string LanguageId(string code)
   {
     var parts = code.Split('-');
-    return parts.Length == 2 ? $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}" : code;
+    return parts.Length switch
+    {
+      2 => $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}",
+      3 => $"{parts[0].ToLowerInvariant()}-{char.ToUpperInvariant(parts[1][0])}{parts[1][1..].ToLowerInvariant()}-{parts[2].ToUpperInvariant()}",   // sr-latn-rs → sr-Latn-RS
+      _ => code,
+    };
   }
 
   private const string TaskbarExplorerOnly = """

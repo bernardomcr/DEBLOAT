@@ -4,6 +4,43 @@ using System.Xml.Linq;
 
 namespace Debloat.Core.Media;
 
+public record CatalogSource(string Versao, string Url);
+
+public record WindowsLanguage(string Code, string Name)
+{
+  public override string ToString() => Name;
+}
+
+/// <summary>Uma versão do Windows 11 (ex.: 25H2) com os .esd de todos os idiomas.</summary>
+public record WindowsRelease(string Version, Version Build, IReadOnlyList<EsdFile> Files)
+{
+  public string Label => $"Windows 11 {Version} (build {Build})";
+
+  public EsdFile? FileFor(string language, string architecture = "x64") => WindowsCatalog.Pick(Files, language, architecture);
+
+  /// <summary>Idiomas com a edição Pro em x64, com o nome no próprio idioma ("português (Brasil)").</summary>
+  public IReadOnlyList<WindowsLanguage> Languages => Files
+    .Where(f => f.Architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) && f.Edition.Equals("Professional", StringComparison.OrdinalIgnoreCase))
+    .Select(f => f.Language.ToLowerInvariant()).Distinct()
+    .Select(code => new WindowsLanguage(code, NativeName(code)))
+    .OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+
+  private static string NativeName(string code)
+  {
+    try
+    {
+      string name = System.Globalization.CultureInfo.GetCultureInfo(code).NativeName;
+      return char.ToUpper(name[0]) + name[1..];
+    }
+    catch (System.Globalization.CultureNotFoundException)
+    {
+      return code;
+    }
+  }
+
+  public override string ToString() => Label;
+}
+
 /// <summary>Um arquivo .esd do catálogo oficial (o mesmo que a Ferramenta de Criação de Mídia usa).</summary>
 public record EsdFile(
   string FileName,
@@ -36,14 +73,28 @@ public record EsdFile(
 /// </summary>
 public static class WindowsCatalog
 {
-  /// <summary>Catálogos conhecidos, do mais novo para o mais antigo. Atualizar quando sair uma versão nova.</summary>
-  public static readonly IReadOnlyList<Uri> Sources =
-  [
-    // 25H2 — Microsoft Download Center "products_25H2" (id 108396)
-    new("https://download.microsoft.com/download/eb1cc454-1c9a-4c94-adf8-b30c7f3d03d1/products.xml"),
-    // Link embutido na MCT (SetupMgr.dll); hoje aponta para a 24H2. Fica como reserva.
-    new("https://go.microsoft.com/fwlink/?LinkId=2156292"),
-  ];
+  /// <summary>
+  /// Lista de catálogos (versão → products.xml). Vem do catalogos.json do repositório no GitHub, para versões novas
+  /// aparecerem sem atualizar o programa; a cópia embutida é a reserva.
+  /// </summary>
+  public const string SourcesUrl = "https://raw.githubusercontent.com/bernardomcr/DEBLOAT/main/catalogos.json";
+
+  public static async Task<IReadOnlyList<CatalogSource>> SourcesAsync(HttpClient http, CancellationToken ct = default)
+  {
+    try
+    {
+      string json = await http.GetStringAsync(SourcesUrl, ct);
+      var list = System.Text.Json.JsonSerializer.Deserialize<List<CatalogSource>>(json, SourceJson);
+      if (list is { Count: > 0 }) return list;
+    }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+    {
+      // sem internet ou GitHub fora: usa a lista embutida
+    }
+    return System.Text.Json.JsonSerializer.Deserialize<List<CatalogSource>>(Resources.Data("catalogos.json"), SourceJson)!;
+  }
+
+  private static readonly System.Text.Json.JsonSerializerOptions SourceJson = new() { PropertyNameCaseInsensitive = true };
 
   private const char Bom = (char)0xFEFF;
 
@@ -71,26 +122,30 @@ public static class WindowsCatalog
       .OrderByDescending(f => f.Build)
       .FirstOrDefault();
 
-  /// <summary>Baixa todos os catálogos e devolve o .esd mais novo entre eles.</summary>
-  public static async Task<EsdFile> FindLatestAsync(HttpClient http, string language = "pt-br", string architecture = "x64", CancellationToken ct = default)
+  /// <summary>Todas as versões disponíveis (mais nova primeiro), cada uma com os seus .esd.</summary>
+  public static async Task<IReadOnlyList<WindowsRelease>> LoadReleasesAsync(HttpClient http, CancellationToken ct = default)
   {
-    var all = new List<EsdFile>();
-    var errors = new List<string>();
-    foreach (var source in Sources)
+    var releases = new List<WindowsRelease>();
+    foreach (var source in await SourcesAsync(http, ct))
     {
       try
       {
-        byte[] data = await http.GetByteArrayAsync(source, ct);
-        all.AddRange(Parse(IsCab(data) ? ExtractCab(data) : System.Text.Encoding.UTF8.GetString(data)));
+        byte[] data = await http.GetByteArrayAsync(source.Url, ct);
+        var files = Parse(IsCab(data) ? ExtractCab(data) : System.Text.Encoding.UTF8.GetString(data));
+        if (files.Count > 0) releases.Add(new WindowsRelease(source.Versao, files.Max(f => f.Build)!, files));
       }
-      catch (Exception e) when (e is HttpRequestException or InvalidDataException or System.Xml.XmlException)
+      catch (Exception e) when (e is HttpRequestException or InvalidDataException or System.Xml.XmlException or TaskCanceledException)
       {
-        errors.Add($"{source.Host}: {e.Message}");
+        // um catálogo fora do ar não derruba os outros
       }
     }
-    return Pick(all, language, architecture)
-      ?? throw new InvalidDataException("Nenhum catálogo da Microsoft respondeu com esse idioma. " + string.Join("; ", errors));
+    return releases.OrderByDescending(r => r.Build).ToList();
   }
+
+  /// <summary>O .esd mais novo para o idioma, entre todas as versões.</summary>
+  public static async Task<EsdFile> FindLatestAsync(HttpClient http, string language = "pt-br", string architecture = "x64", CancellationToken ct = default) =>
+    (await LoadReleasesAsync(http, ct)).Select(r => r.FileFor(language, architecture)).FirstOrDefault(f => f is not null)
+      ?? throw new InvalidDataException("Nenhum catálogo da Microsoft respondeu com esse idioma.");
 
   private static bool IsCab(byte[] data) => data.Length > 4 && data[0] == 'M' && data[1] == 'S' && data[2] == 'C' && data[3] == 'F';
 
