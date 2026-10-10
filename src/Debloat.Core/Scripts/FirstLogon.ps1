@@ -90,10 +90,26 @@ $timer.Start()
 [System.Windows.Forms.Application]::Run( $form )
 '@ | Set-Content -LiteralPath $noticeScript -Encoding UTF8
 
-function Set-Notice([string] $Title, [string] $Detail = '', [int] $Percent = 0) {
+# Estado de cada app para o painel do DEBLOAT (C:\Debloat\estado.json): aguardando, instalando, pronto, erro.
+$stateFile = Join-Path $root 'estado.json'
+$appState = @{}
+$noticeTitle = ''
+$noticeDetail = ''
+$finished = $false
+
+function Save-State {
+	$data = [ordered]@{
+		titulo = $script:noticeTitle
+		detalhe = $script:noticeDetail
+		terminou = $script:finished
+		apps = @( $script:apps | ForEach-Object { [ordered]@{ id = $_.id; nome = $_.name; categoria = $_.category; estado = $script:appState[$_.id] } } )
+	}
+	$json = ConvertTo-Json -InputObject $data -Depth 4
 	foreach( $try in 1..5 ) {
 		try {
-			[System.IO.File]::WriteAllLines( $progressFile, [string[]] @( $Title, $Detail, $Percent ) )
+			# Grava num temporário e troca: o painel nunca lê um arquivo pela metade.
+			[System.IO.File]::WriteAllText( "$stateFile.tmp", $json, (New-Object System.Text.UTF8Encoding $false) )
+			Move-Item -LiteralPath "$stateFile.tmp" -Destination $stateFile -Force
 			return
 		} catch {
 			Start-Sleep -Milliseconds 100
@@ -101,8 +117,41 @@ function Set-Notice([string] $Title, [string] $Detail = '', [int] $Percent = 0) 
 	}
 }
 
+function Set-AppState([string] $Id, [string] $State) {
+	$script:appState[$Id] = $State
+	Save-State
+}
+
+function Set-Notice([string] $Title, [string] $Detail = '', [int] $Percent = 0) {
+	$script:noticeTitle = $Title
+	$script:noticeDetail = $Detail
+	foreach( $try in 1..5 ) {
+		try {
+			[System.IO.File]::WriteAllLines( $progressFile, [string[]] @( $Title, $Detail, $Percent ) )
+			break
+		} catch {
+			Start-Sleep -Milliseconds 100
+		}
+	}
+	Save-State
+}
+
 Set-Notice 'Preparando o Windows' 'Ajustes finais'
-Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$noticeScript`" -Status `"$progressFile`" -Parent $PID"
+# Painel do DEBLOAT (aviso pequeno que abre a lista dos apps) quando o programa veio na mídia; senão, o aviso em PowerShell.
+$panel = $null
+foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
+	$panelExe = Join-Path $drive.RootDirectory 'DEBLOAT\DEBLOAT.exe'
+	if( Test-Path -LiteralPath $panelExe ) {
+		Copy-Item -LiteralPath $panelExe -Destination (Join-Path $root 'DEBLOAT.exe') -Force -ErrorAction SilentlyContinue
+		if( Test-Path -LiteralPath (Join-Path $root 'DEBLOAT.exe') ) { $panel = Join-Path $root 'DEBLOAT.exe' }
+		break
+	}
+}
+if( $panel ) {
+	Start-Process -FilePath $panel -ArgumentList "--painel `"$stateFile`" $PID"
+} else {
+	Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$noticeScript`" -Status `"$progressFile`" -Parent $PID"
+}
 
 # --- Janelas de boas-vindas: o que os instaladores abrem sozinhos (Discord, Tailscale, PowerToys...) ---
 $keepWindows = @( 'explorer', 'powershell', 'pwsh', 'conhost', 'WindowsTerminal', 'SystemSettings', 'TextInputHost', 'ShellExperienceHost', 'StartMenuExperienceHost', 'SearchHost', 'LockApp', 'msiexec' )
@@ -310,6 +359,7 @@ Register-ScheduledTask -TaskName 'DEBLOAT-taxa-maxima' -Action $action -Trigger 
 $apps = @'
 @@APPS@@
 '@ | ConvertFrom-Json
+foreach( $app in $apps ) { $appState[$app.id] = 'aguardando' }
 
 function Wait-Internet {
 	# Mesmo teste que o Windows usa (NCSI). Ping não serve: muita rede/servidor não responde ICMP.
@@ -387,10 +437,10 @@ function Install-FromVendor($App) {
 	if( $sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike "*$($App.signer)*" ) {
 		Write-Log 'apps.log' "  plano B recusado: assinatura $($sig.Status) de '$($sig.SignerCertificate.Subject)'"
 		Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
-		return
+		return $false
 	}
 	Write-Log 'apps.log' "  plano B: instalador oficial assinado por $($App.signer)"
-	Install-Downloaded $file $App.args | Out-Null
+	return (Install-Downloaded $file $App.args) -in @( 0, 1641, 3010 )
 }
 
 function Install-Offline($Item) {
@@ -473,17 +523,19 @@ function Install-App($App) {
 	Write-Log 'apps.log' "Instalando $($App.name)..."
 	if( $offline.ContainsKey( $App.id ) ) {
 		try {
-			if( Install-Offline $offline[$App.id] ) { return }
+			if( Install-Offline $offline[$App.id] ) { return $true }
 		} catch {
 			Write-Log 'apps.log' "  ERRO na mídia: $_"
 		}
 		Write-Log 'apps.log' '  tentando pela internet'
 	}
 	if( $App.source -ne 'feature' ) { Initialize-Online }
+	$ok = $false
 	try {
 		switch( $App.source ) {
 			'feature' {
 				Enable-FromMedia $App.package
+				$ok = $true
 			}
 			'winget' {
 				$wingetArgs = @( 'install', '--exact', '--id', $App.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
@@ -496,27 +548,29 @@ function Install-App($App) {
 					Start-Sleep -Seconds 10
 					$code = Invoke-Winget $wingetArgs
 				}
-				if( $code -ne 0 -and $code -ne -1978335189 -and $App.fallbackUrl ) { Install-FromVendor $App }
+				$ok = $code -in @( 0, -1978335189 )   # -1978335189 = já instalado
+				if( -not $ok -and $App.fallbackUrl ) { $ok = Install-FromVendor $App }
 			}
 			'msstore' {
-				Invoke-Winget @( 'install', '--exact', '--id', $App.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' ) | Out-Null
+				$ok = (Invoke-Winget @( 'install', '--exact', '--id', $App.package, '--source', 'msstore', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )) -in @( 0, -1978335189 )
 			}
 			'url' {
 				$file = Join-Path $env:TEMP ([uri] $App.package).Segments[-1]
 				Get-File $App.package $file
-				Install-Downloaded $file $App.args | Out-Null
+				$ok = (Install-Downloaded $file $App.args) -in @( 0, 1641, 3010 )
 			}
 			'github' {
 				$release = Invoke-RestMethod -Uri "https://api.github.com/repos/$($App.package)/releases/latest" -Headers @{ 'User-Agent' = 'DEBLOAT' }
 				$asset = $release.assets | Where-Object { $_.name -match $App.asset } | Select-Object -First 1
 				$file = Join-Path $env:TEMP $asset.name
 				Get-File $asset.browser_download_url $file
-				Install-Downloaded $file $App.args | Out-Null
+				$ok = (Install-Downloaded $file $App.args) -in @( 0, 1641, 3010 )
 			}
 		}
 	} catch {
 		Write-Log 'apps.log' "  ERRO: $_"
 	}
+	return $ok
 }
 
 # --- Duas filas ao mesmo tempo ---
@@ -530,7 +584,7 @@ $current = $null
 $done = 0
 
 function Update-Notice {
-	$names = @( @( $script:current ) + @( $script:running | ForEach-Object { $_.App.name } ) + @( $script:featureJobs | Where-Object State -eq 'Running' | ForEach-Object Name ) | Where-Object { $_ } )
+	$names = @( @( $script:current ) + @( $script:running | ForEach-Object { $_.App.name } ) + @( $script:featureJobs | Where-Object State -eq 'Running' | ForEach-Object { ($apps | Where-Object id -eq $_.Name).name } ) | Where-Object { $_ } )
 	Set-Notice "Instalando apps: $script:done de $($apps.Count)" ($names -join ', ') -1
 }
 
@@ -541,10 +595,12 @@ function Start-Parallel {
 		$file = Join-Path $offlineDir $item.file
 		Write-Log 'apps.log' "Instalando $($app.name) (em paralelo)..."
 		try {
+			Set-AppState $app.id 'instalando'
 			if( $item.kind -eq 'msix' ) {
 				Add-AppxPackage -Path $file -ErrorAction Stop
 				Write-Log 'apps.log' "  $($app.name): instalado da mídia"
 				Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+				Set-AppState $app.id 'pronto'
 				$script:done++
 				continue
 			}
@@ -568,6 +624,7 @@ function Receive-Parallel {
 		& taskkill.exe /PID $job.Process.Id /T /F | Out-Null
 		Write-Log 'apps.log' "  $($job.App.name): instalador parado há 10 min: encerrado"
 		$script:running = @( $script:running | Where-Object { $_ -ne $job } )
+		Set-AppState $job.App.id 'erro'
 		$script:done++
 	}
 	foreach( $job in @( $script:running | Where-Object { $_.Process.HasExited } ) ) {
@@ -576,9 +633,11 @@ function Receive-Parallel {
 		if( $code -in (@( 0, 1641, 3010 ) + @( $job.Item.successCodes )) ) {
 			Write-Log 'apps.log' "  $($job.App.name): instalador saiu com $code"
 			Remove-Item -LiteralPath $job.File -ErrorAction SilentlyContinue
+			Set-AppState $job.App.id 'pronto'
 			$script:done++
 		} else {
 			Write-Log 'apps.log' "  $($job.App.name): instalador saiu com $code; tenta de novo na fila normal"
+			Set-AppState $job.App.id 'aguardando'
 			[void] $script:retry.Add( $job.App )
 		}
 	}
@@ -599,7 +658,8 @@ foreach( $app in $apps ) {
 # rodam ao lado das duas filas. Sozinho na fila normal, o .NET 3.5 a segurava por 5 min (VM, 10/10/2026).
 $featureJobs = @( $apps | Where-Object source -eq 'feature' | ForEach-Object {
 	Write-Log 'apps.log' "Instalando $($_.name) (em paralelo)..."
-	Start-Job -Name $_.name -ArgumentList ${function:Enable-FromMedia}.ToString(), $_.package -ScriptBlock {
+	$appState[$_.id] = 'instalando'
+	Start-Job -Name $_.id -ArgumentList ${function:Enable-FromMedia}.ToString(), $_.package -ScriptBlock {
 		param( [string] $Body, [string] $Feature )
 		function Write-Log( $File, $Text ) { $Text }   # no processo à parte, as mensagens voltam como saída
 		& ([scriptblock]::Create( $Body )) $Feature
@@ -608,8 +668,14 @@ $featureJobs = @( $apps | Where-Object source -eq 'feature' | ForEach-Object {
 
 function Receive-Features {
 	foreach( $job in @( $script:featureJobs | Where-Object { $_.State -notin 'Running', 'NotStarted' } ) ) {
-		foreach( $line in @( Receive-Job -Job $job -ErrorAction SilentlyContinue ) ) { Write-Log 'apps.log' "  $($job.Name): $line" }
-		if( $job.State -ne 'Completed' ) { Write-Log 'apps.log' "  $($job.Name): ERRO $($job.ChildJobs[0].JobStateInfo.Reason)" }
+		$name = ($apps | Where-Object id -eq $job.Name).name
+		foreach( $line in @( Receive-Job -Job $job -ErrorAction SilentlyContinue ) ) { Write-Log 'apps.log' "  $($name): $line" }
+		if( $job.State -eq 'Completed' ) {
+			Set-AppState $job.Name 'pronto'
+		} else {
+			Write-Log 'apps.log' "  $($name): ERRO $($job.ChildJobs[0].JobStateInfo.Reason)"
+			Set-AppState $job.Name 'erro'
+		}
 		Remove-Job -Job $job -Force
 		$script:featureJobs = @( $script:featureJobs | Where-Object { $_ -ne $job } )
 		$script:done++
@@ -623,8 +689,9 @@ if( $apps.Count -gt 0 ) {
 		Receive-Parallel
 		Close-NewWindows   # o que os apps que já terminaram abriram
 		$current = $app.name
+		Set-AppState $app.id 'instalando'
 		Start-Parallel
-		Install-App $app
+		Set-AppState $app.id $(if( Install-App $app ) { 'pronto' } else { 'erro' })
 		$current = $null
 		$done++
 	}
@@ -637,8 +704,9 @@ if( $apps.Count -gt 0 ) {
 	}
 	foreach( $app in @( $retry ) ) {
 		$current = $app.name
+		Set-AppState $app.id 'instalando'
 		Update-Notice
-		Install-App $app
+		Set-AppState $app.id $(if( Install-App $app ) { 'pronto' } else { 'erro' })
 		$done++
 	}
 	$current = $null
@@ -690,6 +758,7 @@ reg.exe add 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' /v
 Checkpoint-Computer -Description 'Instalação limpa DEBLOAT' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue
 #endregion
 
+$finished = $true
 Set-Notice 'Pronto' 'O Windows está configurado' 100
 Start-Sleep -Seconds 6
 Set-Notice 'FIM'
