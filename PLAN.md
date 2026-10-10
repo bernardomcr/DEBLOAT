@@ -196,7 +196,7 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 4. **Sem a espera final de 15 s:** um processo à parte fecha janelas de boas-vindas por 45 s.
 - Excluir do Defender: descartado pelo usuário.
 - **Versões:** os instaladores são os mais novos do dia em que a mídia é montada (cache de 3 dias). Mídia com
-  mais de 14 dias (`DEBLOATpps\criado.txt`) + internet → o primeiro login ignora e baixa tudo de novo.
+  mais de 14 dias (`DEBLOAT\apps\criado.txt`) + internet → o primeiro login ignora e baixa tudo de novo.
 - Estimativa: lista de 12 min → ~4–5 min. Conferir na rodada final da VM.
 
 ## Vídeo (10/10/2026)
