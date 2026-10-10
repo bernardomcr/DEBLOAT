@@ -60,7 +60,7 @@ public static class TweakCatalog
     new("abrir-este-computador", "Explorador de Arquivos", "Abrir em \"Este Computador\"", "", true),
     new("mostrar-extensoes", "Explorador de Arquivos", "Mostrar extensões dos arquivos", "", true),
     new("mostrar-ocultos", "Explorador de Arquivos", "Mostrar arquivos ocultos", "Os arquivos protegidos do sistema continuam escondidos", true),
-    new("visualizador-fotos", "Explorador de Arquivos", "Visualizador de Fotos antigo como padrão", "Remove o app Fotos", true),
+    new("visualizador-fotos", "Explorador de Arquivos", "Visualizador de Fotos antigo como padrão", "", true),
 
     // Barra de tarefas e Iniciar
     new("barra-esquerda", "Barra de tarefas e Iniciar", "Barra de tarefas à esquerda", "", true),

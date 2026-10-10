@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
-using System.IO;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Security.Principal;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Debloat.Core.Catalog;
 using Debloat.Core.Media;
 using Debloat.Core.Presets;
@@ -39,23 +39,48 @@ public partial class CategoryItem(AppCategory category, IEnumerable<AppItem> app
   }
 }
 
+/// <summary>Uma linha da lista do Debloat: um ajuste ou um app a remover.</summary>
+public partial class TweakRow(string id, string name, string detail, bool presetValue, bool aggressive) : ObservableObject
+{
+  public string Id { get; } = id;
+  public string Name { get; } = name;
+  public string Detail { get; } = detail;
+  public bool HasDetail => Detail.Length > 0;
+  public bool PresetValue { get; } = presetValue;
+  public bool Aggressive { get; } = aggressive;
+
+  [ObservableProperty]
+  private bool isSelected = presetValue;
+}
+
+public partial class TweakGroup(string name, IEnumerable<TweakRow> rows) : ObservableObject
+{
+  public string Name { get; } = name;
+
+  public ObservableCollection<TweakRow> Rows { get; } = new(rows);
+
+  public string Summary => $"{Rows.Count(r => r.IsSelected)} de {Rows.Count}";
+
+  public void Refresh() => OnPropertyChanged(nameof(Summary));
+}
+
 public record DnsOption(DnsChoice Value, string Label);
 
-public partial class MigrationRow(MigrationItem item) : ObservableObject
+public partial class MigrationRow(MigrationItem item, bool selected) : ObservableObject
 {
   public MigrationItem Item { get; } = item;
 
   public string Detail => Item.Kind == MigrationKind.Wifi ? Item.Note : $"{MainViewModel.Size(Item.Bytes)} · {Item.Note}";
 
   [ObservableProperty]
-  private bool isSelected = item.DefaultSelected;
+  private bool isSelected = selected;
 }
 
 public partial class SaveItem(SaveGame game) : ObservableObject
 {
   public SaveGame Game { get; } = game;
 
-  public string Detail => $"{Game.Source} · {Game.Files} arquivo(s) · {(Game.Bytes < 1_000_000 ? $"{Game.Bytes / 1e3:F0} KB" : $"{Game.Bytes / 1e6:F1} MB")}";
+  public string Detail => $"{Game.Source} · {Game.Files} arquivo(s) · {MainViewModel.Size(Game.Bytes)}";
 
   [ObservableProperty]
   private bool isSelected = true;
@@ -63,11 +88,13 @@ public partial class SaveItem(SaveGame game) : ObservableObject
 
 public partial class MainViewModel : ObservableObject
 {
+  public const string RemovedAppsGroup = "Apps removidos";
+
   private readonly AppCatalog catalog = AppCatalog.Load();
+  private readonly HardwareProfile hardware = HardwareProfile.Detect();
 
   public MainViewModel()
   {
-    Hardware = HardwareProfile.Detect();
     Categories = new(catalog.Categories.Select(c => new CategoryItem(c,
       catalog.Apps.Where(a => a.Category == c.Id).Select(a => new AppItem(a)))));
     foreach (var category in Categories)
@@ -77,64 +104,128 @@ public partial class MainViewModel : ObservableObject
         app.PropertyChanged += (_, _) => { category.Refresh(); OnPropertyChanged(nameof(AppsSummary)); };
       }
     }
+
+    var groups = TweakCatalog.All.GroupBy(t => t.Group)
+      .Select(g => new TweakGroup(g.Key, g.Select(t => new TweakRow(t.Id, t.Name, t.Detail, t.DefaultFor(hardware), t.Aggressive))))
+      .Append(new TweakGroup(RemovedAppsGroup,
+        TweakCatalog.Bloatware.Select(b => new TweakRow(b.Id, b.Name, "", b.Default(hardware), false))));
+    TweakGroups = new(groups);
+    foreach (var group in TweakGroups)
+    {
+      foreach (var row in group.Rows)
+      {
+        row.PropertyChanged += (_, _) => { group.Refresh(); OnPropertyChanged(nameof(TweaksSummary)); };
+      }
+    }
     selectedDns = DnsOptions[1];
   }
 
-  public HardwareProfile Hardware { get; }
+  // --- Debloat ---
 
-  public string MachineKind => Hardware.HasBattery ? "Notebook (tem bateria)" : "Desktop (sem bateria)";
-  public string HelloText => Hardware.HasIrCamera ? "Câmera IR encontrada: Windows Hello por rosto será mantido" : "Sem câmera IR: Windows Hello por rosto será removido";
-  public string PenText => Hardware.HasPenOrTouch ? "Tela touch/caneta: manuscrito será mantido" : "Sem touch/caneta: manuscrito e painel de matemática serão removidos";
-  public string PowerText => Hardware.HasBattery ? "Plano Equilibrado, hibernação mantida, Localizar Dispositivo mantido" : "Plano Equilibrado + modo Melhor desempenho, hibernação desligada";
+  public ObservableCollection<TweakGroup> TweakGroups { get; }
+
+  public string TweaksSummary
+  {
+    get
+    {
+      int changed = TweakGroups.SelectMany(g => g.Rows).Count(r => r.IsSelected != r.PresetValue);
+      return changed == 0 ? "Preset Recomendado" : $"Personalizado ({changed} {(changed == 1 ? "mudança" : "mudanças")})";
+    }
+  }
+
+  [RelayCommand]
+  private void ResetTweaks()
+  {
+    foreach (var row in TweakGroups.SelectMany(g => g.Rows)) row.IsSelected = row.PresetValue;
+  }
+
+  public IReadOnlyList<string> PresetHighlights { get; } =
+  [
+    "Remove Copilot, Recall, Teams, Clipchamp, Notícias, Clima, OneDrive, Outlook novo e outros apps inúteis",
+    "Mantém Bloco de Notas, Calculadora, Ferramenta de Captura, Xbox e Loja; Media Player vira o VLC",
+    "Telemetria no mínimo, sem anúncios no Iniciar, no Explorer, na tela de bloqueio e nas Configurações",
+    "Windows Update baixa sozinho, nunca reinicia com você usando o PC e adia versões grandes por 1 ano",
+    "Sem Widgets, sem Bing na busca, sem Copilot, sem IA no Paint e no Bloco de Notas",
+    "Xbox Game Bar desligada; Modo de Jogo e GPU por hardware ligados",
+    "SmartScreen mantido; Smart App Control desligado; sem criptografia automática do disco",
+    "Ponto de restauração no final de tudo",
+  ];
+
+  // --- Apps ---
 
   public ObservableCollection<CategoryItem> Categories { get; }
 
   public string AppsSummary => $"{Categories.Sum(c => c.Apps.Count(a => a.IsSelected))} itens marcados";
 
+  // --- Windows ---
+
   public IReadOnlyList<DnsOption> DnsOptions { get; } =
   [
-    new(DnsChoice.Provider, "Do provedor (não mexer)"),
-    new(DnsChoice.Cloudflare, "Cloudflare (1.1.1.1) — rápido"),
-    new(DnsChoice.CloudflareFamily, "Cloudflare Família — bloqueia adulto e malware"),
-    new(DnsChoice.AdGuard, "AdGuard — bloqueia anúncios"),
+    new(DnsChoice.Provider, "Do provedor"),
+    new(DnsChoice.Cloudflare, "Cloudflare (1.1.1.1)"),
+    new(DnsChoice.CloudflareFamily, "Cloudflare Família (bloqueia adulto e malware)"),
+    new(DnsChoice.AdGuard, "AdGuard (bloqueia anúncios)"),
     new(DnsChoice.Google, "Google (8.8.8.8)"),
-    new(DnsChoice.Quad9, "Quad9 — bloqueia sites maliciosos"),
+    new(DnsChoice.Quad9, "Quad9 (bloqueia sites maliciosos)"),
   ];
 
   [ObservableProperty] private DnsOption selectedDns;
   [ObservableProperty] private string userName = "Usuario";
-  [ObservableProperty] private bool darkMode = true;
-  [ObservableProperty] private bool leftTaskbar = true;
-  [ObservableProperty] private bool classicContextMenu = true;
-  [ObservableProperty] private bool classicPhotoViewer = true;
   [ObservableProperty] private string status = "";
 
-  public IReadOnlyList<string> PresetHighlights { get; } =
-  [
-    "Remove Copilot, Recall, Teams, Clipchamp, Notícias, Clima, OneDrive, Outlook novo e outros 25 apps inúteis",
-    "Mantém Bloco de Notas, Media Player, Calculadora, Ferramenta de Captura, Xbox e Loja",
-    "Telemetria no mínimo, sem anúncios no Iniciar, no Explorer, na tela de bloqueio e nas Configurações",
-    "Windows Update baixa sozinho, nunca reinicia com você logado e adia versões grandes por 1 ano",
-    "Sem Widgets, sem Bing na busca, sem IA no Paint e no Bloco de Notas, sem Click to Do",
-    "Gravação contínua do Xbox desligada; Game Bar, Modo de Jogo e GPU por hardware ligados",
-    "SmartScreen mantido; Smart App Control desligado; sem criptografia automática do disco",
-    "Bloqueia bloatware do fabricante injetado pela BIOS (WPBT) e apps companheiros de hardware",
-    "Ponto de restauração \"Instalação limpa DEBLOAT\" no final de tudo",
-  ];
+  public ObservableCollection<WindowsRelease> Releases { get; } = [];
+  public ObservableCollection<WindowsLanguage> Languages { get; } = [];
 
-  public DebloatOptions BuildOptions() => new()
+  [ObservableProperty] private WindowsRelease? selectedRelease;
+  [ObservableProperty] private WindowsLanguage? selectedLanguage;
+
+  public string WindowsVersion => SelectedFile is { } f
+    ? $"Build {SelectedRelease!.Build} · {SelectedLanguage!.Name} · {f.Size / 1e9:F1} GB"
+    : Releases.Count == 0 ? "Procurando versões..." : "";
+
+  private EsdFile? SelectedFile => SelectedLanguage is { } l ? SelectedRelease?.FileFor(l.Code) : null;
+
+  public async Task LoadReleasesAsync()
   {
-    UserName = UserName.Trim(),
-    Hardware = Hardware,
-    DarkMode = DarkMode,
-    LeftTaskbar = LeftTaskbar,
-    ClassicContextMenu = ClassicContextMenu,
-    ClassicPhotoViewer = ClassicPhotoViewer,
-    Dns = SelectedDns.Value,
-    SelectedApps = Categories.SelectMany(c => c.Apps).Where(a => a.IsSelected).Select(a => a.Entry.Id).ToList(),
-  };
+    try
+    {
+      var releases = await WindowsCatalog.LoadReleasesAsync(Http);
+      foreach (var r in releases) Releases.Add(r);
+      SelectedRelease = Releases.FirstOrDefault();
+    }
+    catch (Exception e)
+    {
+      Status = $"Não deu para buscar as versões do Windows: {e.Message}";
+    }
+  }
 
-  // --- Windows: download e mídia ---
+  partial void OnSelectedReleaseChanged(WindowsRelease? value)
+  {
+    string keep = SelectedLanguage?.Code ?? "pt-br";
+    Languages.Clear();
+    foreach (var l in value?.Languages ?? []) Languages.Add(l);
+    SelectedLanguage = Languages.FirstOrDefault(l => l.Code == keep) ?? Languages.FirstOrDefault(l => l.Code == "pt-br") ?? Languages.FirstOrDefault();
+    OnPropertyChanged(nameof(WindowsVersion));
+  }
+
+  partial void OnSelectedLanguageChanged(WindowsLanguage? value) => OnPropertyChanged(nameof(WindowsVersion));
+
+  public DebloatOptions BuildOptions()
+  {
+    var rows = TweakGroups.SelectMany(g => g.Rows.Select(r => (Group: g.Name, Row: r))).ToList();
+    return new()
+    {
+      UserName = UserName.Trim(),
+      Hardware = hardware,
+      Language = SelectedLanguage?.Code ?? "pt-br",
+      Tweaks = rows.Where(x => x.Group != RemovedAppsGroup && x.Row.IsSelected).Select(x => x.Row.Id).ToHashSet(),
+      RemovedApps = rows.Where(x => x.Group == RemovedAppsGroup && x.Row.IsSelected).Select(x => x.Row.Id).ToHashSet(),
+      Dns = SelectedDns.Value,
+      SelectedApps = Categories.SelectMany(c => c.Apps).Where(a => a.IsSelected).Select(a => a.Entry.Id).ToList(),
+    };
+  }
+
+  // --- Download e mídia ---
 
   private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
@@ -146,9 +237,7 @@ public partial class MainViewModel : ObservableObject
 
   [ObservableProperty] private bool isBusy;
   [ObservableProperty] private double progressValue;
-  [ObservableProperty] private string windowsVersion = "Ainda não baixado.";
 
-  private EsdFile? esd;
   private string? esdPath;
 
   [RelayCommand]
@@ -156,22 +245,21 @@ public partial class MainViewModel : ObservableObject
 
   private async Task EnsureWindowsAsync()
   {
-    Status = "Procurando a versão mais recente nos catálogos da Microsoft...";
-    esd ??= await WindowsCatalog.FindLatestAsync(Http);
-    WindowsVersion = $"Windows 11 build {esd.Build} · {esd.Language} · {esd.Size / 1e9:F1} GB (servidores da Microsoft)";
+    var esd = SelectedFile ?? throw new InvalidOperationException("Escolha a versão e o idioma do Windows.");
     string cache = Directory.CreateDirectory(Path.Combine(DataDir, "cache")).FullName;
     string path = Path.Combine(cache, esd.FileName);
+    if (esdPath == path) return;
     var progress = new Progress<DownloadProgress>(p =>
     {
       ProgressValue = p.Fraction * 100;
       Status = p.Done >= p.Total
-        ? "Conferindo a integridade (SHA-256)..."
+        ? "Conferindo a integridade..."
         : $"Baixando: {p.Done / 1e9:F2} de {p.Total / 1e9:F2} GB · {p.BytesPerSecond / 1e6:F0} MB/s";
     });
     await new SegmentedDownloader(Http).DownloadAsync(esd.Url, path, esd.Size, esd.Sha256, esd.Sha1, progress);
     foreach (var old in Directory.EnumerateFiles(cache, "*.esd").Where(f => f != path)) File.Delete(old);
     esdPath = path;
-    Status = "Windows baixado e conferido.";
+    Status = "Windows baixado.";
   }
 
   [RelayCommand]
@@ -179,12 +267,12 @@ public partial class MainViewModel : ObservableObject
   {
     if (!IsAdmin)
     {
-      Status = "Para montar a instalação, abra o DEBLOAT como administrador.";
+      Status = "Abra o DEBLOAT como administrador.";
       return;
     }
     await RunBusy(async () =>
     {
-      if (esdPath is null) await EnsureWindowsAsync();
+      await EnsureWindowsAsync();
       byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
       var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 100; Status = step.Text + "..."; });
       await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
@@ -198,20 +286,20 @@ public partial class MainViewModel : ObservableObject
   {
     if (!IsAdmin)
     {
-      Status = "Para montar a instalação, abra o DEBLOAT como administrador.";
+      Status = "Abra o DEBLOAT como administrador.";
       return;
     }
     var dialog = new SaveFileDialog { FileName = "DEBLOAT-Windows11.iso", Filter = "Imagem ISO (*.iso)|*.iso", Title = "Salvar ISO" };
     if (dialog.ShowDialog() != true) return;
     await RunBusy(async () =>
     {
-      if (esdPath is null) await EnsureWindowsAsync();
+      await EnsureWindowsAsync();
       byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
       await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
         new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 90; Status = step.Text + "..."; }));
       Status = "Gerando a ISO...";
       await Task.Run(() => IsoWriter.Write(MediaDir, dialog.FileName));
-      Status = $"ISO pronta: {dialog.FileName} (boota em UEFI e BIOS; serve para Ventoy e máquina virtual).";
+      Status = $"ISO pronta: {dialog.FileName}";
     });
   }
 
@@ -220,8 +308,8 @@ public partial class MainViewModel : ObservableObject
   public ObservableCollection<SaveItem> Saves { get; } = [];
 
   public string SavesSummary => Saves.Count == 0
-    ? "Clique em procurar. Nada é copiado até você gravar o pendrive."
-    : $"{Saves.Count(s => s.IsSelected)} de {Saves.Count} jogos marcados · {Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes) / 1e6:F0} MB";
+    ? ""
+    : $"{Saves.Count(s => s.IsSelected)} de {Saves.Count} jogos · {Size(Saves.Where(s => s.IsSelected).Sum(s => s.Game.Bytes))}";
 
   private SaveScanner Scanner => new(Http, Path.Combine(DataDir, "tools"));
 
@@ -247,7 +335,7 @@ public partial class MainViewModel : ObservableObject
     foreach (var save in Saves) save.IsSelected = select;
   }
 
-  // --- Migração (Wi-Fi, ShareX, navegadores, pastas) ---
+  // --- Migração (programas e pastas) ---
 
   public ObservableCollection<MigrationRow> Migration { get; } = [];
 
@@ -262,7 +350,22 @@ public partial class MainViewModel : ObservableObject
   {
     var items = await Task.Run(Debloat.Core.Saves.Migration.Detect);
     Migration.Clear();
-    foreach (var item in items) Migration.Add(new MigrationRow(item));
+    foreach (var item in items) Migration.Add(new MigrationRow(item, item.DefaultSelected));
+  }
+
+  [RelayCommand]
+  private async Task AddFolder()
+  {
+    var dialog = new OpenFolderDialog { Title = "Pasta para levar para o Windows novo", Multiselect = true };
+    if (dialog.ShowDialog() != true) return;
+    foreach (string folder in dialog.FolderNames)
+    {
+      if (Migration.Any(m => string.Equals(m.Item.Path, folder, StringComparison.OrdinalIgnoreCase))) continue;
+      long bytes = await Task.Run(() => Debloat.Core.Saves.Migration.Size(folder, []));
+      string id = "pasta-" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(folder.ToLowerInvariant())))[..8];
+      var item = new MigrationItem(id, MigrationKind.Folder, Path.GetFileName(folder.TrimEnd('\\')) is { Length: > 0 } n ? n : folder, folder, bytes, folder, true);
+      Migration.Add(new MigrationRow(item, true));
+    }
   }
 
   /// <summary>Quanto vai para a partição de dados (saves + migração).</summary>
@@ -284,7 +387,7 @@ public partial class MainViewModel : ObservableObject
       UsbDrives.Clear();
       foreach (var d in drives) UsbDrives.Add(d);
       SelectedUsb = UsbDrives.FirstOrDefault();
-      if (UsbDrives.Count == 0) Status = "Nenhum pendrive USB encontrado. Conecte um e clique em atualizar.";
+      if (UsbDrives.Count == 0) Status = "Nenhum pendrive USB encontrado.";
     }
     catch (Exception e)
     {
@@ -297,43 +400,43 @@ public partial class MainViewModel : ObservableObject
   {
     if (!IsAdmin)
     {
-      Status = "Para gravar o pendrive, abra o DEBLOAT como administrador.";
+      Status = "Abra o DEBLOAT como administrador.";
       return;
     }
     var migration = Migration.Where(m => m.IsSelected).Select(m => m.Item).ToList();
     var open = Debloat.Core.Saves.Migration.OpenPrograms(migration);
     if (open.Count > 0)
     {
-      Status = $"Feche antes de gravar (eles travam os arquivos): {string.Join(", ", open)}.";
+      Status = $"Feche antes de gravar: {string.Join(", ", open)}.";
       return;
     }
     long dataSpace = drive.Size - UsbWriter.BootPartitionSize(drive.Size);
     if (BackupBytes > 0 && BackupBytes > dataSpace - (512L << 20))
     {
-      Status = $"O backup marcado ({Size(BackupBytes)}) não cabe na parte de dados deste pendrive ({Size(dataSpace)}). Desmarque algumas pastas.";
+      Status = $"O backup marcado ({Size(BackupBytes)}) não cabe no pendrive ({Size(dataSpace)} livres para backup).";
       return;
     }
     await RunBusy(async () =>
     {
-      if (esdPath is null) await EnsureWindowsAsync();
+      await EnsureWindowsAsync();
       byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
       await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
         new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 60; Status = step.Text + "..."; }));
-      Status = "Levando os drivers de rede, disco e chipset deste PC...";
+      Status = "Copiando drivers de rede, disco e chipset...";
       var drivers = await DriverExporter.ExportAsync(MediaDir);
       var (_, data) = await UsbWriter.WriteAsync(drive, MediaDir,
         new Progress<WriteStep>(step => { ProgressValue = 60 + step.Fraction * 38; Status = step.Text + "..."; }));
       var saves = Saves.Where(s => s.IsSelected).Select(s => s.Game).ToList();
       if (saves.Count > 0 && data is char d)
       {
-        Status = $"Salvando {saves.Count} saves de jogos no pendrive...";
+        Status = $"Salvando {saves.Count} saves...";
         await Scanner.BackupAsync(saves, $"{d}:\\");
       }
       if (migration.Count > 0 && data is char m)
       {
         await Debloat.Core.Saves.Migration.BackupAsync(migration, $"{m}:\\", new Progress<string>(text => Status = text));
       }
-      Status = $"Pendrive pronto ({drivers.Count} drivers de hardware, {saves.Count} saves). Dê boot por ele no PC que vai ser formatado.";
+      Status = $"Pendrive pronto ({drivers.Count} drivers, {saves.Count} saves).";
     });
   }
 
@@ -369,7 +472,7 @@ public partial class MainViewModel : ObservableObject
     try
     {
       File.WriteAllBytes(dialog.FileName, new UnattendBuilder(catalog).BuildBytes(BuildOptions()));
-      Status = $"Salvo em {dialog.FileName}. Copie para a raiz do pendrive de instalação.";
+      Status = $"Salvo em {dialog.FileName}.";
     }
     catch (Exception e)
     {

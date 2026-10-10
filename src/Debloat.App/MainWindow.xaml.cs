@@ -13,8 +13,7 @@ public partial class MainWindow : FluentWindow
     InitializeComponent();
     Loaded += async (_, _) =>
     {
-      await vm.RefreshUsbCommand.ExecuteAsync(null);
-      await vm.LoadMigrationAsync();
+      await Task.WhenAll(vm.LoadReleasesAsync(), vm.RefreshUsbCommand.ExecuteAsync(null), vm.LoadMigrationAsync());
     };
   }
 

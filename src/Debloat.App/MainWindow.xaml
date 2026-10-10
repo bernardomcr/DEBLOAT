@@ -2,8 +2,7 @@
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                 xmlns:local="clr-namespace:Debloat.App"
-                 Title="DEBLOAT" Width="960" Height="680" MinWidth="760" MinHeight="520"
+                 Title="DEBLOAT" Width="980" Height="700" MinWidth="760" MinHeight="520"
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round">
   <ui:FluentWindow.Resources>
@@ -11,18 +10,17 @@
     <Style x:Key="SectionTitle" TargetType="TextBlock">
       <Setter Property="FontSize" Value="20" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="Margin" Value="0,0,0,10" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
-    <Style x:Key="Hint" TargetType="TextBlock">
+    <Style x:Key="Secondary" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12" />
       <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Margin" Value="0,0,0,16" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
-    <Style x:Key="Line" TargetType="TextBlock">
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Margin" Value="0,3" />
-      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
   </ui:FluentWindow.Resources>
 
@@ -33,43 +31,38 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <ui:TitleBar Grid.Row="0" Title="DEBLOAT — Windows 11 limpo, do jeito certo" />
+    <ui:TitleBar Grid.Row="0" Title="DEBLOAT" />
 
     <TabControl Grid.Row="1" Margin="12,4,12,0">
-
-      <!-- ESTE PC -->
-      <TabItem Header="Este PC">
-        <ScrollViewer Padding="16">
-          <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitle}" Text="O que encontrei neste PC" />
-            <TextBlock Style="{StaticResource Hint}" Text="O preset se ajusta ao hardware. Nada aqui é apagado sem você confirmar na aba Criar." />
-            <ui:Card Margin="0,0,0,8">
-              <StackPanel>
-                <TextBlock Style="{StaticResource Line}" FontWeight="SemiBold" Text="{Binding MachineKind}" />
-                <TextBlock Style="{StaticResource Line}" Text="{Binding PowerText}" />
-                <TextBlock Style="{StaticResource Line}" Text="{Binding HelloText}" />
-                <TextBlock Style="{StaticResource Line}" Text="{Binding PenText}" />
-              </StackPanel>
-            </ui:Card>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
 
       <!-- WINDOWS -->
       <TabItem Header="Windows">
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Style="{StaticResource SectionTitle}" Text="Windows 11" />
-            <TextBlock Style="{StaticResource Hint}" Text="Windows 11 Pro em português (Brasil), teclado ABNT2, horário de Brasília. Baixado direto dos servidores da Microsoft, com conferência de integridade." />
-            <ui:Button Content="Baixar o Windows 11 mais recente" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" Command="{Binding DownloadWindowsCommand}" Margin="0,0,0,8" />
-            <TextBlock Style="{StaticResource Hint}" Text="{Binding WindowsVersion}" Margin="0,0,0,24" />
+            <Grid Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Versão" />
+                <ComboBox ItemsSource="{Binding Releases}" SelectedItem="{Binding SelectedRelease}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Idioma" />
+                <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" />
+              </StackPanel>
+            </Grid>
+            <TextBlock Style="{StaticResource Secondary}" Text="{Binding WindowsVersion}" Margin="0,0,0,8" />
+            <ui:Button Content="Baixar" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" Command="{Binding DownloadWindowsCommand}" Margin="0,0,0,24" />
 
             <TextBlock Style="{StaticResource SectionTitle}" Text="Conta" />
-            <TextBlock Style="{StaticResource Hint}" Text="Conta local de administrador, sem senha, com login automático." />
-            <ui:TextBox Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Nome de usuário" Margin="0,0,0,24" />
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Nome de usuário" />
+            <ui:TextBox Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,24" />
 
             <TextBlock Style="{StaticResource SectionTitle}" Text="DNS" />
-            <TextBlock Style="{StaticResource Hint}" Text="Aplicado em todas as placas de rede, com DNS criptografado (DoH)." />
             <ComboBox ItemsSource="{Binding DnsOptions}" SelectedItem="{Binding SelectedDns}" DisplayMemberPath="Label" />
           </StackPanel>
         </ScrollViewer>
@@ -80,8 +73,7 @@
         <ScrollViewer Padding="16">
           <StackPanel>
             <TextBlock Style="{StaticResource SectionTitle}" Text="Preset Recomendado" />
-            <TextBlock Style="{StaticResource Hint}" Text="Já vem pronto. Cada escolha foi pesada entre o que se ganha e o que se perde." />
-            <ui:Card Margin="0,0,0,16">
+            <ui:Card Margin="0,0,0,20">
               <ItemsControl ItemsSource="{Binding PresetHighlights}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
@@ -94,11 +86,41 @@
               </ItemsControl>
             </ui:Card>
 
-            <TextBlock Style="{StaticResource SectionTitle}" Text="Visual" />
-            <ui:CardControl Header="Modo escuro" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding DarkMode}" /></ui:CardControl>
-            <ui:CardControl Header="Barra de tarefas à esquerda" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding LeftTaskbar}" /></ui:CardControl>
-            <ui:CardControl Header="Menu de contexto clássico (botão direito completo)" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding ClassicContextMenu}" /></ui:CardControl>
-            <ui:CardControl Header="Visualizador de Fotos antigo como padrão" Margin="0,0,0,4"><ui:ToggleSwitch IsChecked="{Binding ClassicPhotoViewer}" /></ui:CardControl>
+            <DockPanel Margin="0,0,0,10">
+              <ui:Button DockPanel.Dock="Right" Content="Voltar ao preset" Icon="{ui:SymbolIcon ArrowReset24}" Command="{Binding ResetTweaksCommand}" />
+              <TextBlock Style="{StaticResource SectionTitle}" Text="Ajustes" Margin="0" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding TweaksSummary}" Margin="12,4,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </DockPanel>
+            <ItemsControl ItemsSource="{Binding TweakGroups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <ui:CardExpander Margin="0,0,0,6" IsExpanded="False">
+                    <ui:CardExpander.Header>
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" VerticalAlignment="Center" Margin="0,0,16,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </ui:CardExpander.Header>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox IsChecked="{Binding IsSelected}" Margin="0,3">
+                            <StackPanel>
+                              <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}" />
+                                <TextBlock Text="  · agressivo" Foreground="#E0A030" Visibility="{Binding Aggressive, Converter={StaticResource BoolToVisibility}}" />
+                              </StackPanel>
+                              <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                          </CheckBox>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ui:CardExpander>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -110,10 +132,10 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
-          <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitle}" Text="Apps e pré-requisitos" />
-            <TextBlock Style="{StaticResource Hint}" Text="{Binding AppsSummary, StringFormat='Instalados sozinhos no primeiro login. {0}.'}" />
-          </StackPanel>
+          <DockPanel Margin="0,0,0,10">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Apps" Margin="0" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding AppsSummary}" Margin="12,4,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+          </DockPanel>
           <ScrollViewer Grid.Row="1">
             <ItemsControl ItemsSource="{Binding Categories}">
               <ItemsControl.ItemTemplate>
@@ -134,7 +156,7 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                          <CheckBox Width="270" Margin="0,2" IsChecked="{Binding IsSelected}" Content="{Binding Entry.Name}"
+                          <CheckBox Width="280" Margin="0,2" IsChecked="{Binding IsSelected}" Content="{Binding Entry.Name}"
                                     ToolTip="{Binding Entry.Description}" />
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -151,16 +173,15 @@
       <TabItem Header="Backup">
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="820" HorizontalAlignment="Left">
-            <TextBlock Style="{StaticResource SectionTitle}" Text="Levar para o Windows novo" />
-            <TextBlock Style="{StaticResource Hint}" Text="Vai para a partição DEBLOAT-DADOS do pendrive quando você gravar, e volta sozinho para o lugar de origem no primeiro login do Windows novo. Tudo marcado aqui vai junto." />
-            <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}" IsExpanded="True">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Backup" />
+            <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Games24}" IsExpanded="True">
               <ui:CardExpander.Header>
                 <DockPanel>
                   <ui:Button DockPanel.Dock="Right" Content="Marcar/desmarcar todos" Appearance="Transparent" Command="{Binding ToggleAllSavesCommand}" Margin="0,0,12,0" />
                   <ui:Button DockPanel.Dock="Right" Content="Procurar saves" Appearance="Primary" Command="{Binding ScanSavesCommand}" Margin="0,0,8,0" />
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Saves de jogos" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding SavesSummary}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding SavesSummary}" Style="{StaticResource Secondary}" />
                   </StackPanel>
                 </DockPanel>
               </ui:CardExpander.Header>
@@ -170,19 +191,20 @@
                     <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
                       <StackPanel>
                         <TextBlock Text="{Binding Game.Name}" />
-                        <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" />
                       </StackPanel>
                     </CheckBox>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </ui:CardExpander>
-            <ui:CardExpander Margin="0,8,0,4" Icon="{ui:SymbolIcon ArrowSync24}" IsExpanded="True">
+
+            <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Folder24}" IsExpanded="True">
               <ui:CardExpander.Header>
-                <StackPanel>
-                  <TextBlock Text="Wi-Fi, ShareX, navegadores e pastas" FontWeight="SemiBold" />
-                  <TextBlock Text="Feche os navegadores antes de gravar. Chrome/Edge/Brave: login e senhas voltam pela sincronização da conta." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
+                <DockPanel>
+                  <ui:Button DockPanel.Dock="Right" Content="Adicionar pasta" Icon="{ui:SymbolIcon FolderAdd24}" Command="{Binding AddFolderCommand}" Margin="0,0,12,0" />
+                  <TextBlock Text="Programas e pastas" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
               </ui:CardExpander.Header>
               <ItemsControl ItemsSource="{Binding Migration}">
                 <ItemsControl.ItemTemplate>
@@ -190,7 +212,7 @@
                     <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
                       <StackPanel>
                         <TextBlock Text="{Binding Item.Name}" />
-                        <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" />
                       </StackPanel>
                     </CheckBox>
                   </DataTemplate>
@@ -205,9 +227,9 @@
       <TabItem Header="Criar">
         <ScrollViewer Padding="16">
           <StackPanel MaxWidth="640" HorizontalAlignment="Left">
-            <TextBlock Style="{StaticResource SectionTitle}" Text="Criar a instalação" />
-            <TextBlock Style="{StaticResource Hint}" Text="Baixa o Windows (se ainda não baixou), monta a instalação com o seu preset, leva os drivers de rede/disco/chipset deste PC e grava tudo no pendrive. O pendrive é APAGADO." />
-            <DockPanel Margin="0,0,0,8">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Criar instalação" />
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Pendrive" />
+            <DockPanel Margin="0,0,0,12">
               <ui:Button DockPanel.Dock="Right" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RefreshUsbCommand}" Margin="8,0,0,0" ToolTip="Procurar pendrives" />
               <ComboBox ItemsSource="{Binding UsbDrives}" SelectedItem="{Binding SelectedUsb}" DisplayMemberPath="Label" />
             </DockPanel>
@@ -217,7 +239,6 @@
               <ui:Button Content="Só montar a pasta" Icon="{ui:SymbolIcon Wrench24}" Command="{Binding BuildMediaCommand}" Margin="0,0,8,8" />
               <ui:Button Content="Só o autounattend.xml" Icon="{ui:SymbolIcon DocumentArrowDown24}" Command="{Binding ExportXmlCommand}" Margin="0,0,8,8" />
             </WrapPanel>
-            <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0" Text="Só aparecem pendrives USB. HDs, SSDs e o disco do Windows nunca entram na lista." />
           </StackPanel>
         </ScrollViewer>
       </TabItem>

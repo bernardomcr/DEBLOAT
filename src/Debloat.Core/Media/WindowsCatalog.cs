@@ -38,7 +38,7 @@ public record WindowsRelease(string Version, Version Build, IReadOnlyList<EsdFil
     }
   }
 
-  public override string ToString() => Label;
+  public override string ToString() => $"Windows 11 {Version}";
 }
 
 /// <summary>Um arquivo .esd do catálogo oficial (o mesmo que a Ferramenta de Criação de Mídia usa).</summary>
