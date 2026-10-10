@@ -28,13 +28,18 @@ public class UnattendBuilderTests
   }
 
   [Fact]
-  public void Mantem_bloco_de_notas_media_player_e_fala()
+  public void Mantem_bloco_de_notas_e_fala_e_troca_o_media_player_pelo_VLC()
   {
     string xml = Generate(new DebloatOptions());
     Assert.Contains("Microsoft.BingNews", xml);              // removido
     Assert.DoesNotContain("'Microsoft.WindowsNotepad'", xml);
-    Assert.DoesNotContain("'Microsoft.ZuneMusic'", xml);
     Assert.DoesNotContain("'Language.Speech'", xml);
+    Assert.Contains("'Microsoft.ZuneMusic'", xml);           // VLC no preset: Media Player sai
+    Assert.Contains("ProgId=\"VLC.mp4\"", xml);
+
+    string semVlc = Generate(new DebloatOptions { SelectedApps = ["chrome"] });
+    Assert.DoesNotContain("'Microsoft.ZuneMusic'", semVlc);  // sem VLC, o Media Player fica
+    Assert.DoesNotContain("VLC.mp4", semVlc);
   }
 
   [Fact]
@@ -54,7 +59,7 @@ public class UnattendBuilderTests
   {
     string xml = Generate(new DebloatOptions { Dns = DnsChoice.AdGuard, SelectedApps = ["steam", "everything-toolbar"] });
     Assert.Contains("DisableClickToDo", xml);                 // SystemTweaks
-    Assert.Contains("HistoricalCaptureEnabled", xml);         // DefaultUserTweaks
+    Assert.Contains("GameDVR_Enabled", xml);                  // DefaultUserTweaks (Game Bar desligada)
     Assert.Contains("$dnsChoice = 'adguard'", xml);
     Assert.Contains("Valve.Steam", xml);
     Assert.Contains("voidtools.Everything", xml);             // dependência do Toolbar

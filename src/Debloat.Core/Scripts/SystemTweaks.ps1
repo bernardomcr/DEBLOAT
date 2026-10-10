@@ -1,14 +1,11 @@
 # DEBLOAT — políticas da máquina (fase "specialize", roda como SYSTEM antes de criar a conta).
-# Cada bloco corresponde a uma decisão do PLAN.md. Valores marcados "conferir em VM" ainda não
-# foram validados numa instalação real; se o nome estiver errado, o Windows só ignora a chave.
+# Cada "#region tweak:<id>" é um ajuste do TweakCatalog; o programa remove os blocos dos ajustes desligados.
 
 function Set-Policy([string] $Key, [string] $Name, [int] $Value) {
 	reg.exe add $Key /v $Name /t REG_DWORD /d $Value /f | Out-Null
 }
 
-$hasBattery = [bool](Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue)
-
-# --- Telemetria e diagnóstico ---
+#region tweak:telemetria
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'DoNotShowFeedbackNotifications' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat' 'AITEnable' 0           # telemetria de aplicativos
@@ -17,9 +14,14 @@ Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat' 'DisableUAR' 1  
 # Mecanismo de compatibilidade e SwitchBack ficam LIGADOS de propósito (quebram programas antigos).
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting' 'Disabled' 1
 # O log local do Relatório de Erros continua ligado (não envia nada e ajuda a diagnosticar travamentos).
-Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo' 'DisabledByGroupPolicy' 1
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy' 'LetAppsAccessBackgroundSpatialPerception' 2
+#endregion
 
-# --- Conteúdo de nuvem, dicas e "experiências do consumidor" ---
+#region tweak:id-anuncio
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo' 'DisabledByGroupPolicy' 1
+#endregion
+
+#region tweak:conteudo-nuvem
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableCloudOptimizedContent' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableConsumerAccountStateContent' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableSoftLanding' 1
@@ -27,11 +29,15 @@ Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableWindo
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Speech' 'AllowSpeechModelUpdate' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\PushToInstall' 'DisablePushToInstall' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'DisableGraphRecentItems' 1   # insights da conta no Explorer
-Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'HideRecommendedSection' 1    # "Recomendado" do Iniciar (conferir em VM no Pro)
+#endregion
 
-# --- IA do Windows ---
+#region tweak:recomendado-iniciar
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'HideRecommendedSection' 1
+#endregion
+
+#region tweak:ia-windows
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'DisableClickToDo' 1
-Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'DisableSettingsAgent' 1      # busca agêntica nas Configurações (conferir em VM)
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'DisableSettingsAgent' 1      # busca agêntica nas Configurações
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'AllowRecallEnablement' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' 'DisableAIDataAnalysis' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 1
@@ -39,8 +45,9 @@ Set-Policy 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint' 'Disa
 Set-Policy 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint' 'DisableGenerativeFill' 1
 Set-Policy 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint' 'DisableImageCreator' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\WindowsNotepad' 'DisableAIFeatures' 1
+#endregion
 
-# --- Pesquisa ---
+#region tweak:pesquisa-web
 $search = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
 Set-Policy $search 'AllowCortana' 0
 Set-Policy $search 'AllowCloudSearch' 0
@@ -49,30 +56,31 @@ Set-Policy $search 'EnableDynamicContentInWSB' 0    # destaques da pesquisa
 Set-Policy $search 'AlwaysUseAutoLangDetection' 0
 Set-Policy $search 'ConnectedSearchUseWeb' 0
 Set-Policy $search 'DisableWebSearch' 1
+#endregion
 
-# --- Privacidade de apps (só movimento em segundo plano; apps em segundo plano continuam permitidos) ---
-Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy' 'LetAppsAccessBackgroundSpatialPerception' 2
-
-# --- Histórico de atividades e sincronização ---
+#region tweak:historico-atividades
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'EnableActivityFeed' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'PublishUserActivities' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'UploadUserActivities' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'AllowCrossDeviceClipboard' 0   # Win+V local continua
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisableSettingSync' 2
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisableSettingSyncUserOverride' 1
+#endregion
 
-# --- Widgets (além do que o gerador já desliga) ---
+#region tweak:sem-widgets
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Dsh' 'DisableWidgetsOnLockScreen' 1
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Dsh' 'DisableWidgetsBoard' 1
+#endregion
 
-# --- Edge (Chromium) ---
+#region tweak:edge-extras
 $edge = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
 Set-Policy $edge 'HubsSidebarEnabled' 0             # barra lateral / Copilot
 Set-Policy $edge 'EdgeShoppingAssistantEnabled' 0
 Set-Policy $edge 'ShowRecommendationsEnabled' 0
 Set-Policy $edge 'PersonalizationReportingEnabled' 0
+#endregion
 
-# --- Windows Update: baixa sozinho, nunca reinicia com alguém logado, versões grandes adiadas ---
+#region tweak:update-controlado
 $wu = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
 Set-Policy "$wu\AU" 'NoAutoUpdate' 0
 Set-Policy "$wu\AU" 'AUOptions' 4
@@ -80,18 +88,49 @@ Set-Policy "$wu\AU" 'NoAutoRebootWithLoggedOnUsers' 1
 Set-Policy $wu 'DeferFeatureUpdates' 1
 Set-Policy $wu 'DeferFeatureUpdatesPeriodInDays' 365
 Set-Policy $wu 'DeferQualityUpdates' 0
+#endregion
 
-# --- Otimização de Entrega: sem enviar atualizações para estranhos na internet ---
+#region tweak:otimizacao-entrega
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization' 'DODownloadMode' 0
+#endregion
 
-# --- Jogos: agendamento de GPU acelerado por hardware ---
+#region tweak:gpu-agendamento
 Set-Policy 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' 'HwSchMode' 2
+#endregion
 
-# --- Depende do hardware ---
-if( -not $hasBattery ) {
-	# Desktop: sem "Localizar meu dispositivo"; num notebook ele fica (acha o notebook roubado).
-	Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice' 'AllowFindMyDevice' 0
-	# Modo de energia "Melhor desempenho" (sobreposição do plano Equilibrado). Fica aqui porque a chave só aceita
-	# escrita do SYSTEM: no primeiro login deu "Acesso negado" na VM.
-	reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' /v ActiveOverlayAcPowerScheme /t REG_SZ /d 'ded574b5-45a0-4f42-8737-46345c09c238' /f | Out-Null
+#region tweak:sem-game-bar
+# Desliga gravação/overlay e tira o app da Game Bar; o app Xbox, o Game Pass e o Modo de Jogo continuam.
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR' 'AllowGameDVR' 0
+Get-AppxProvisionedPackage -Online | Where-Object DisplayName -eq 'Microsoft.XboxGamingOverlay' | Remove-AppxProvisionedPackage -Online -AllUsers -ErrorAction SilentlyContinue | Out-Null
+# Sem o app, jogos e o Win+G abririam o aviso "você vai precisar de um novo aplicativo para abrir este link
+# ms-gamingoverlay": esses protocolos passam a não fazer nada.
+foreach( $protocol in 'ms-gamebar', 'ms-gamebarservices', 'ms-gamingoverlay' ) {
+	reg.exe add "HKLM\SOFTWARE\Classes\$protocol" /ve /d "URL:$protocol" /f | Out-Null
+	reg.exe add "HKLM\SOFTWARE\Classes\$protocol" /v 'URL Protocol' /d '' /f | Out-Null
+	reg.exe add "HKLM\SOFTWARE\Classes\$protocol" /v 'NoOpenWith' /d '' /f | Out-Null
+	reg.exe add "HKLM\SOFTWARE\Classes\$protocol\shell\open\command" /ve /d '%SystemRoot%\System32\systray.exe' /f | Out-Null
 }
+#endregion
+
+#region tweak:localizar-dispositivo
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice' 'AllowFindMyDevice' 0
+#endregion
+
+#region tweak:melhor-desempenho
+# Sobreposição "Melhor desempenho" do plano Equilibrado. Só o SYSTEM escreve nessa chave (no primeiro login dava
+# "Acesso negado" na VM), por isso fica aqui.
+reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' /v ActiveOverlayAcPowerScheme /t REG_SZ /d 'ded574b5-45a0-4f42-8737-46345c09c238' /f | Out-Null
+#endregion
+
+#region associacoes
+# Programas padrão (VLC, Visualizador de Fotos) pela política oficial de associações. Ela vale em todo login:
+# o FirstLogon agenda a remoção depois que o VLC já estiver instalado, para o usuário poder trocar depois.
+$assocXml = @'
+@@ASSOC@@
+'@
+if( $assocXml.Trim() ) {
+	$assocFile = "$env:SystemRoot\System32\DEBLOAT-associacoes.xml"
+	[System.IO.File]::WriteAllText( $assocFile, $assocXml.Trim(), [System.Text.Encoding]::UTF8 )
+	reg.exe add 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' /v DefaultAssociationsConfiguration /t REG_SZ /d $assocFile /f | Out-Null
+}
+#endregion

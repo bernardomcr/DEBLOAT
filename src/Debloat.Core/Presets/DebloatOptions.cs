@@ -3,15 +3,16 @@ namespace Debloat.Core.Presets;
 public enum DnsChoice { Provider, Cloudflare, CloudflareFamily, AdGuard, Google, Quad9 }
 
 /// <summary>
-/// Tudo que o usuário escolhe na janela. Os valores padrão SÃO o preset "Recomendado":
-/// quem só clica em "Criar" recebe exatamente isto.
+/// Tudo que o usuário escolhe na janela. Sem mexer em nada, isto É o preset Recomendado.
+/// Tweaks/RemovedApps nulos = valores do preset para o hardware (TweakCatalog).
 /// </summary>
 public record DebloatOptions
 {
   // Conta e região
   public string UserName { get; init; } = "Usuario";
   public string Password { get; init; } = "";              // decisão do usuário: sem senha
-  public string Language { get; init; } = "pt-BR";
+  public string Language { get; init; } = "pt-BR";          // idioma da imagem baixada
+  public string Locale { get; init; } = "pt-BR";            // formatos (data, moeda)
   public string Keyboard { get; init; } = "00010416";       // ABNT2
   public string GeoId { get; init; } = "32";                // Brasil
   public string TimeZone { get; init; } = "E. South America Standard Time";
@@ -20,43 +21,18 @@ public record DebloatOptions
   /// <summary>Apaga o disco 0 e instala sem perguntar. Só para máquina virtual/teste: o padrão é escolher o disco na tela.</summary>
   public bool WipeDisk0 { get; init; }
 
-  // Hardware do PC (decide Hello, caneta, hibernação, Localizar Dispositivo)
   public HardwareProfile Hardware { get; init; } = HardwareProfile.Desktop;
 
-  // Aparência
-  public bool DarkMode { get; init; } = true;
-  public bool LeftTaskbar { get; init; } = true;
-  public bool ClassicContextMenu { get; init; } = true;
-  public bool ClassicPhotoViewer { get; init; } = true;
+  public IReadOnlySet<string>? Tweaks { get; init; }
+  public IReadOnlySet<string>? RemovedApps { get; init; }
 
-  // Rede e apps
   public DnsChoice Dns { get; init; } = DnsChoice.Cloudflare;
   public IReadOnlyList<string>? SelectedApps { get; init; }   // null = padrões do catálogo
 
-  /// <summary>Bloatware removido sempre (decidido na revisão do XML do 1155).</summary>
-  public static readonly IReadOnlyList<string> AlwaysRemoved =
-  [
-    "Remove3DViewer", "RemoveBingSearch", "RemoveClipchamp", "RemoveCopilot", "RemoveCortana",
-    "RemoveDevHome", "RemoveFamily", "RemoveFeedbackHub", "RemoveGetHelp", "RemoveMailCalendar",
-    "RemoveMaps", "RemoveMixedReality", "RemoveZuneVideo", "RemoveNews", "RemoveOffice365",
-    "RemoveOneDrive", "RemoveOneNote", "RemoveOneSync", "RemoveOutlook", "RemovePaint3D",
-    "RemovePeople", "RemovePowerAutomate", "RemoveQuickAssist", "RemoveRecall", "RemoveSkype",
-    "RemoveSolitaire", "RemoveStepsRecorder", "RemoveTeams", "RemoveGetStarted", "RemoveToDo",
-    "RemoveWallet", "RemoveWeather", "RemoveYourPhone",
-  ];
+  public IReadOnlySet<string> EffectiveTweaks => Tweaks ?? TweakCatalog.DefaultsFor(Hardware);
 
-  /// <summary>Lista final de remoção, ajustada ao hardware e às escolhas.</summary>
-  public IReadOnlyList<string> Bloatware
-  {
-    get
-    {
-      var list = new List<string>(AlwaysRemoved);
-      if (ClassicPhotoViewer) list.Add("RemovePhotos");
-      if (!Hardware.HasIrCamera) list.Add("RemoveWindowsHello");
-      if (!Hardware.HasPenOrTouch) list.AddRange(["RemoveHandwriting", "RemoveMathInputPanel"]);
-      // Mantidos de propósito: Bloco de Notas, Media Player (ZuneMusic), Fala/Narrador,
-      // Conexão de Área de Trabalho Remota, Xbox, Loja, Calculadora, Ferramenta de Captura.
-      return list;
-    }
-  }
+  public bool Has(string tweak) => EffectiveTweaks.Contains(tweak);
+
+  public IReadOnlySet<string> EffectiveRemovedApps =>
+    RemovedApps ?? TweakCatalog.Bloatware.Where(b => b.Default(Hardware)).Select(b => b.Id).ToHashSet();
 }

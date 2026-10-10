@@ -51,7 +51,7 @@ public class CatalogTests
   public void Apps_do_usuario_vem_marcados()
   {
     string[] mine = ["discord", "chrome", "steam", "firefox", "whatsapp", "claude", "chatgpt", "parsec",
-      "rustdesk", "tailscale", "sharex", "nanazip", "winrar", "7zip", "hydra", "wand"];
+      "rustdesk", "tailscale", "sharex", "nanazip", "hydra", "wand", "telegram", "vlc", "python"];
     foreach (var id in mine) Assert.True(catalog.Apps.Single(a => a.Id == id).Default, id);
   }
 }

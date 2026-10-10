@@ -20,7 +20,7 @@ function Write-Log([string] $File, [string] $Text) {
 	}
 }
 
-# --- Telemetria: serviço e tarefas agendadas ---
+#region tweak:servicos-telemetria
 foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
 	Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
 	Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
@@ -35,12 +35,20 @@ foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
 	$path = (Split-Path $_ -Parent) + '\'
 	Disable-ScheduledTask -TaskPath $path -TaskName (Split-Path $_ -Leaf) -ErrorAction SilentlyContinue | Out-Null
 }
+#endregion
 
-# --- Energia: plano Equilibrado sempre; desktop ganha "Melhor desempenho" e perde a hibernação ---
 powercfg.exe /setactive SCHEME_BALANCED
-if( -not $hasBattery ) {
-	powercfg.exe /hibernate off
-}
+
+#region tweak:sem-hibernacao
+powercfg.exe /hibernate off
+#endregion
+
+#region associacoes
+# A política de programas padrão (SystemTweaks) é aplicada em todo login. Remove no login seguinte, quando o
+# VLC já está instalado e a associação já foi aplicada, para o usuário poder trocar depois.
+$removeAction = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c timeout /t 120 && reg.exe delete HKLM\SOFTWARE\Policies\Microsoft\Windows\System /v DefaultAssociationsConfiguration /f && schtasks.exe /delete /tn DEBLOAT-associacoes /f'
+Register-ScheduledTask -TaskName 'DEBLOAT-associacoes' -Action $removeAction -Trigger (New-ScheduledTaskTrigger -AtLogOn) -User 'SYSTEM' -RunLevel Highest -Force -ErrorAction SilentlyContinue | Out-Null
+#endregion
 
 # --- DNS ---
 $dnsChoice = '@@DNS@@'
@@ -244,10 +252,13 @@ if( $apps.Count -gt 0 ) {
 
 Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
-# --- Sudo do Windows (24H2+) ---
+#region tweak:sudo
 if( Get-Command sudo.exe -ErrorAction SilentlyContinue ) { sudo.exe config --enable normal | Out-Null }
+#endregion
 
-# --- Ponto de restauração "zero", depois que tudo foi instalado ---
+#region tweak:ponto-restauracao
+# Depois que tudo foi instalado: é o "voltar ao zero" sem formatar.
 Enable-ComputerRestore -Drive "$env:SystemDrive\" -ErrorAction SilentlyContinue
 reg.exe add 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' /v SystemRestorePointCreationFrequency /t REG_DWORD /d 0 /f | Out-Null
 Checkpoint-Computer -Description 'Instalação limpa DEBLOAT' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue
+#endregion

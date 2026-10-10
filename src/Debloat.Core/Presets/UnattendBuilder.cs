@@ -22,14 +22,19 @@ public sealed class UnattendBuilder
   public XmlDocument Build(DebloatOptions options)
   {
     var apps = catalog.Resolve(options.SelectedApps ?? catalog.Defaults.Select(a => a.Id));
+    bool Has(string tweak) => options.Has(tweak);
+    bool vlc = apps.Any(a => a.Id == "vlc");
     bool everythingToolbar = apps.Any(a => a.Id == "everything-toolbar");
+
+    // Sem o VLC, tirar o Media Player deixaria o PC sem player de vídeo/música.
+    var removed = options.EffectiveRemovedApps.Where(id => id != "RemoveZuneMusic" || vlc);
 
     var config = Configuration.Default with
     {
       LanguageSettings = new UnattendedLanguageSettings(
-        ImageLanguage: generator.Lookup<ImageLanguage>(options.Language),
+        ImageLanguage: generator.Lookup<ImageLanguage>(LanguageId(options.Language)),
         LocaleAndKeyboard: new LocaleAndKeyboard(
-          generator.Lookup<UserLocale>(options.Language),
+          generator.Lookup<UserLocale>(options.Locale),
           generator.Lookup<KeyboardIdentifier>(options.Keyboard)),
         LocaleAndKeyboard2: null,
         LocaleAndKeyboard3: null,
@@ -53,79 +58,109 @@ public sealed class UnattendBuilder
             EditionSettings: new UnattendedEditionSettings(generator.Lookup<WindowsEdition>(options.Edition)),
             BypassRequirementsCheck: true),
       ActivationKey = options.WipeDisk0 ? new ProductKey(GenericKeys[options.Edition]) : null,
-      Bloatwares = options.Bloatware.Select(generator.Lookup<Bloatware>).ToImmutableList(),
+      Bloatwares = removed.Select(generator.Lookup<Bloatware>).ToImmutableList(),
       ExpressSettings = ExpressSettingsMode.DisableAll,
-      ScriptSettings = new ScriptSettings(Scripts(options, apps), RestartExplorer: true),
+      ScriptSettings = new ScriptSettings(Scripts(options, apps, vlc), RestartExplorer: true),
       HidePowerShellWindows = true,
 
-      // Sistema
-      EnableLongPaths = true,
-      AllowPowerShellScripts = true,
-      DisableLastAccess = true,
-      PreventAutomaticReboot = true,
-      DisableSac = true,                 // Smart App Control bloqueia muito programa legítimo
-      DisableSmartScreen = false,        // SmartScreen fica: protege e não custa nada
-      DisableFastStartup = true,
-      DisableAppSuggestions = true,
-      DisableWidgets = true,
-      PreventDeviceEncryption = true,
-      DisableWpbt = true,                // bloatware do fabricante injetado pela BIOS
-      PreventDeviceApps = true,          // "apps companheiros" de hardware
-      DeleteWindowsOld = true,
-
-      // Edge
-      HideEdgeFre = true,
-      DisableEdgeStartupBoost = true,
-      MakeEdgeUninstallable = true,
-      DeleteEdgeDesktopIcon = true,
-
-      // Explorer, Iniciar e barra de tarefas
-      ClassicContextMenu = options.ClassicContextMenu,
-      LaunchToThisPC = true,
-      ShowFileExtensions = true,
-      HideFiles = HideModes.HiddenSystem,
-      ShowEndTask = true,
-      ShowAllTrayIcons = true,
-      LeftTaskbar = options.LeftTaskbar,
-      HideTaskViewButton = true,
-      DisableBingResults = true,
+      // Ajustes da lista (TweakCatalog) que são opções do próprio gerador
+      EnableLongPaths = Has("caminhos-longos"),
+      AllowPowerShellScripts = Has("scripts-powershell"),
+      DisableLastAccess = Has("sem-ultimo-acesso"),
+      PreventAutomaticReboot = Has("update-sem-reiniciar"),
+      DisableWindowsUpdate = Has("update-desligado"),
+      DisableSac = Has("sem-smart-app-control"),
+      DisableSmartScreen = Has("sem-smartscreen"),
+      DisableUac = Has("sem-uac"),
+      DisableCoreIsolation = Has("sem-isolamento-nucleo"),
+      DisableFastStartup = Has("sem-inicializacao-rapida"),
+      DisableAppSuggestions = Has("sugestoes-apps"),
+      DisableWidgets = Has("sem-widgets"),
+      PreventDeviceEncryption = Has("sem-criptografia"),
+      DisableWpbt = Has("sem-wpbt"),
+      PreventDeviceApps = Has("sem-apps-fabricante"),
+      DeleteWindowsOld = Has("apagar-windows-old"),
+      TurnOffSystemSounds = Has("sem-sons"),
+      HideEdgeFre = Has("edge-boas-vindas"),
+      DisableEdgeStartupBoost = Has("edge-segundo-plano"),
+      MakeEdgeUninstallable = Has("edge-desinstalavel"),
+      DeleteEdgeDesktopIcon = Has("edge-icone"),
+      ClassicContextMenu = Has("menu-classico"),
+      LaunchToThisPC = Has("abrir-este-computador"),
+      ShowFileExtensions = Has("mostrar-extensoes"),
+      HideFiles = Has("mostrar-ocultos") ? HideModes.HiddenSystem : HideModes.Hidden,
+      ShowEndTask = Has("finalizar-tarefa"),
+      ShowAllTrayIcons = Has("todos-icones-bandeja"),
+      LeftTaskbar = Has("barra-esquerda"),
+      HideTaskViewButton = Has("sem-visao-tarefas"),
+      DisableBingResults = Has("pesquisa-web"),
       TaskbarSearch = everythingToolbar ? TaskbarSearchMode.Hide : TaskbarSearchMode.Box,
-      StartPinsSettings = new EmptyStartPinsSettings(),
-      TaskbarIcons = new CustomTaskbarIcons(TaskbarExplorerOnly),     // sem Edge e Loja fixados (visto na VM)
-      DesktopIcons = new CustomDesktopIconSettings(new Dictionary<DesktopIcon, bool>
-      {
-        [generator.Lookup<DesktopIcon>("ThisPC")] = true,
-        [generator.Lookup<DesktopIcon>("RecycleBin")] = true,
-      }),
-      ColorSettings = options.DarkMode
+      StartPinsSettings = Has("iniciar-vazio") ? new EmptyStartPinsSettings() : new DefaultStartPinsSettings(),
+      TaskbarIcons = Has("barra-so-explorador") ? new CustomTaskbarIcons(TaskbarExplorerOnly) : new DefaultTaskbarIcons(),
+      DesktopIcons = Has("icones-area-trabalho")
+        ? new CustomDesktopIconSettings(new Dictionary<DesktopIcon, bool>
+          {
+            [generator.Lookup<DesktopIcon>("ThisPC")] = true,
+            [generator.Lookup<DesktopIcon>("RecycleBin")] = true,
+          })
+        : new DefaultDesktopIconSettings(),
+      ColorSettings = Has("modo-escuro")
         ? new CustomColorSettings(ColorTheme.Dark, ColorTheme.Dark, EnableTransparency: true,
             AccentColorOnStart: false, AccentColorOnBorders: false, AccentColor: Color.FromArgb(0x00, 0x78, 0xD4))
         : new DefaultColorSettings(),
-
-      // Entrada
-      DisablePointerPrecision = true,
-      StickyKeysSettings = new DisabledStickyKeysSettings(),
+      Effects = Has("efeitos-desempenho") ? new BestPerformanceEffects() : new DefaultEffects(),
+      DisablePointerPrecision = Has("mouse-sem-aceleracao"),
+      StickyKeysSettings = Has("sem-teclas-aderentes") ? new DisabledStickyKeysSettings() : new DefaultStickyKeysSettings(),
     };
 
     return generator.GenerateXml(config);
   }
 
-  private static List<Script> Scripts(DebloatOptions options, IReadOnlyList<AppEntry> apps)
+  private static List<Script> Scripts(DebloatOptions options, IReadOnlyList<AppEntry> apps, bool vlc)
   {
+    var tweaks = options.EffectiveTweaks;
+    string associations = Associations(vlc, options.Has("visualizador-fotos"));
+    var named = associations.Length > 0 ? new HashSet<string> { "associacoes" } : new HashSet<string>();
+
     var scripts = new List<Script>
     {
-      new(Resources.Script("SystemTweaks.ps1"), ScriptPhase.System, ScriptType.Ps1),
-      new(Resources.Script("DefaultUserTweaks.ps1"), ScriptPhase.DefaultUser, ScriptType.Ps1),
+      new(ScriptRegions.Apply(Resources.Script("SystemTweaks.ps1"), tweaks, named).Replace("@@ASSOC@@", associations), ScriptPhase.System, ScriptType.Ps1),
+      new(ScriptRegions.Apply(Resources.Script("DefaultUserTweaks.ps1"), tweaks, named), ScriptPhase.DefaultUser, ScriptType.Ps1),
     };
-    if (options.ClassicPhotoViewer)
+    if (options.Has("visualizador-fotos"))
     {
       scripts.Add(new(Resources.Script("PhotoViewer.reg"), ScriptPhase.FirstLogon, ScriptType.Reg));
     }
-    string firstLogon = Resources.Script("FirstLogon.ps1")
+    string firstLogon = ScriptRegions.Apply(Resources.Script("FirstLogon.ps1"), tweaks, named)
       .Replace("@@DNS@@", DnsToken(options.Dns))
       .Replace("@@APPS@@", AppCatalog.ToScriptJson(apps));
     scripts.Add(new(firstLogon, ScriptPhase.FirstLogon, ScriptType.Ps1));
     return scripts;
+  }
+
+  private static readonly string[] VideoAudio =
+    [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".m2ts", ".3gp",
+     ".mp3", ".flac", ".wav", ".aac", ".m4a", ".ogg", ".opus", ".wma"];
+
+  private static readonly (string Ext, string ProgId)[] Images =
+    [(".jpg", "PhotoViewer.FileAssoc.Jpeg"), (".jpeg", "PhotoViewer.FileAssoc.Jpeg"), (".png", "PhotoViewer.FileAssoc.Png"),
+     (".bmp", "PhotoViewer.FileAssoc.Bitmap"), (".gif", "PhotoViewer.FileAssoc.Gif"), (".tif", "PhotoViewer.FileAssoc.Tiff"),
+     (".tiff", "PhotoViewer.FileAssoc.Tiff")];
+
+  /// <summary>XML da política de programas padrão (VLC e Visualizador de Fotos); vazio se não houver nada.</summary>
+  public static string Associations(bool vlc, bool photoViewer)
+  {
+    var lines = new List<string>();
+    if (vlc) lines.AddRange(VideoAudio.Select(e => $"""  <Association Identifier="{e}" ProgId="VLC{e}" ApplicationName="VLC media player" />"""));
+    if (photoViewer) lines.AddRange(Images.Select(i => $"""  <Association Identifier="{i.Ext}" ProgId="{i.ProgId}" ApplicationName="Windows Photo Viewer" />"""));
+    return lines.Count == 0 ? "" : "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<DefaultAssociations>\n" + string.Join("\n", lines) + "\n</DefaultAssociations>";
+  }
+
+  /// <summary>"pt-br" (catálogo da Microsoft) → "pt-BR" (gerador).</summary>
+  public static string LanguageId(string code)
+  {
+    var parts = code.Split('-');
+    return parts.Length == 2 ? $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}" : code;
   }
 
   private const string TaskbarExplorerOnly = """
