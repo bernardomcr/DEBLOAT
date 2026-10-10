@@ -173,25 +173,42 @@ public partial class MainViewModel : ObservableObject
   [ObservableProperty] private string userName = "Usuario";
   [ObservableProperty] private string status = "";
 
-  public ObservableCollection<WindowsRelease> Releases { get; } = [];
-  public ObservableCollection<WindowsLanguage> Languages { get; } = [];
+  // --- Windows: versão, build e idioma ---
 
-  [ObservableProperty] private WindowsRelease? selectedRelease;
+  /// <summary>Uma build escolhível: a pronta da Microsoft (Official) ou uma do UUP dump (Uup), que precisa ser convertida.</summary>
+  public record BuildOption(Version Build, WindowsRelease? Official, UupBuild? Uup)
+  {
+    public override string ToString() => Official is not null ? $"{Build} (pronta da Microsoft)" : $"{Build}";
+  }
+
+  public record VersionGroup(string Label, List<BuildOption> Builds)
+  {
+    public override string ToString() => Label == "Insider" ? "Windows 11 Insider" : $"Windows 11 {Label}";
+  }
+
+  public ObservableCollection<VersionGroup> Versions { get; } = [];
+  public ObservableCollection<BuildOption> Builds { get; } = [];
+  public ObservableCollection<WindowsLanguage> Languages { get; } =
+    [new("pt-br", "Português (Brasil)"), new("en-us", "English (United States)")];
+
+  [ObservableProperty] private VersionGroup? selectedVersion;
+  [ObservableProperty] private BuildOption? selectedBuild;
   [ObservableProperty] private WindowsLanguage? selectedLanguage;
 
-  public string WindowsVersion => SelectedFile is { } f
-    ? $"Build {SelectedRelease!.Build} · {SelectedLanguage!.Name} · {f.Size / 1e9:F1} GB"
-    : Releases.Count == 0 ? "Procurando versões..." : "";
-
-  private EsdFile? SelectedFile => SelectedLanguage is { } l ? SelectedRelease?.FileFor(l.Code) : null;
+  public string WindowsVersion => SelectedBuild switch
+  {
+    { Official: { } r } when SelectedLanguage is { } l && r.FileFor(l.Code) is { } f => $"Build {SelectedBuild.Build} · {l.Name} · {f.Size / 1e9:F1} GB",
+    { Uup: not null } when SelectedLanguage is { } l => $"Build {SelectedBuild.Build} · {l.Name} · montada a partir das atualizações da Microsoft (mais demorado)",
+    _ => Versions.Count == 0 ? "Procurando versões..." : "",
+  };
 
   public async Task LoadReleasesAsync()
   {
     try
     {
-      var releases = await WindowsCatalog.LoadReleasesAsync(Http);
-      foreach (var r in releases) Releases.Add(r);
-      SelectedRelease = Releases.FirstOrDefault();
+      foreach (var r in await WindowsCatalog.LoadReleasesAsync(Http)) AddBuild(r.Version, new BuildOption(r.Build, r, null));
+      SelectedVersion = Versions.FirstOrDefault();
+      SelectedLanguage = Languages[0];
     }
     catch (Exception e)
     {
@@ -199,14 +216,44 @@ public partial class MainViewModel : ObservableObject
     }
   }
 
-  partial void OnSelectedReleaseChanged(WindowsRelease? value)
+  [RelayCommand]
+  private async Task RefreshBuilds() => await RunBusy(async () =>
   {
-    string keep = SelectedLanguage?.Code ?? "pt-br";
-    Languages.Clear();
-    foreach (var l in value?.Languages ?? []) Languages.Add(l);
-    SelectedLanguage = Languages.FirstOrDefault(l => l.Code == keep) ?? Languages.FirstOrDefault(l => l.Code == "pt-br") ?? Languages.FirstOrDefault();
-    OnPropertyChanged(nameof(WindowsVersion));
+    Status = "Buscando todas as builds (UUP dump)...";
+    var keep = SelectedBuild;
+    foreach (var b in await UupDump.ListBuildsAsync(Http))
+    {
+      var group = Versions.FirstOrDefault(v => v.Label == b.Version);
+      if (group?.Builds.Any(x => x.Build == b.Build) == true) continue;   // a pronta da Microsoft já está
+      AddBuild(b.Version, new BuildOption(b.Build, null, b));
+    }
+    var ordered = Versions.OrderBy(v => v.Label == "Insider").ThenByDescending(v => v.Builds.Max(b => b.Build)).ToList();
+    Versions.Clear();
+    foreach (var v in ordered)
+    {
+      v.Builds.Sort((a, b) => b.Build.CompareTo(a.Build));
+      Versions.Add(v);
+    }
+    SelectedVersion = Versions.FirstOrDefault(v => v.Builds.Contains(keep!)) ?? Versions.FirstOrDefault();
+    SelectedBuild = keep is not null && Builds.Contains(keep) ? keep : Builds.FirstOrDefault();
+    Status = $"{Versions.Sum(v => v.Builds.Count)} builds disponíveis.";
+  });
+
+  private void AddBuild(string version, BuildOption option)
+  {
+    var group = Versions.FirstOrDefault(v => v.Label == version);
+    if (group is null) Versions.Add(group = new VersionGroup(version, []));
+    group.Builds.Add(option);
   }
+
+  partial void OnSelectedVersionChanged(VersionGroup? value)
+  {
+    Builds.Clear();
+    foreach (var b in value?.Builds ?? []) Builds.Add(b);
+    SelectedBuild = Builds.FirstOrDefault(b => b.Official is not null) ?? Builds.FirstOrDefault();
+  }
+
+  partial void OnSelectedBuildChanged(BuildOption? value) => OnPropertyChanged(nameof(WindowsVersion));
 
   partial void OnSelectedLanguageChanged(WindowsLanguage? value) => OnPropertyChanged(nameof(WindowsVersion));
 
@@ -243,11 +290,29 @@ public partial class MainViewModel : ObservableObject
   [RelayCommand]
   private async Task DownloadWindows() => await RunBusy(EnsureWindowsAsync);
 
+  private string? preparedFolder;     // build do UUP dump já convertida
+
+  /// <summary>Garante o Windows escolhido em cache: o .esd da Microsoft, ou a pasta convertida pelo UUP dump.</summary>
   private async Task EnsureWindowsAsync()
   {
-    var esd = SelectedFile ?? throw new InvalidOperationException("Escolha a versão e o idioma do Windows.");
+    var build = SelectedBuild ?? throw new InvalidOperationException("Escolha a versão e a build do Windows.");
+    string language = SelectedLanguage?.Code ?? "pt-br";
     string cache = Directory.CreateDirectory(Path.Combine(DataDir, "cache")).FullName;
+
+    if (build.Uup is { } uup)
+    {
+      if (!IsAdmin) throw new InvalidOperationException("Para montar uma build do UUP dump, abra o DEBLOAT como administrador.");
+      string work = Path.Combine(cache, $"uup-{uup.Build}-{language}");
+      preparedFolder = await UupDump.BuildFolderAsync(Http, uup, language, work,
+        new Progress<MediaStep>(s => { ProgressValue = s.Fraction * 100; Status = s.Text + "..."; }));
+      esdPath = null;
+      Status = "Windows montado.";
+      return;
+    }
+
+    var esd = build.Official!.FileFor(language) ?? throw new InvalidOperationException("Essa build não tem esse idioma.");
     string path = Path.Combine(cache, esd.FileName);
+    preparedFolder = null;
     if (esdPath == path) return;
     var progress = new Progress<DownloadProgress>(p =>
     {
@@ -262,6 +327,22 @@ public partial class MainViewModel : ObservableObject
     Status = "Windows baixado.";
   }
 
+  /// <summary>Monta a pasta de instalação com o preset (de .esd ou da pasta convertida).</summary>
+  private async Task PrepareMediaAsync(double share)
+  {
+    await EnsureWindowsAsync();
+    byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
+    var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * share; Status = step.Text + "..."; });
+    if (preparedFolder is not null)
+    {
+      await MediaBuilder.BuildFromFolderAsync(preparedFolder, MediaDir, "Professional", xml, progress);
+    }
+    else
+    {
+      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
+    }
+  }
+
   [RelayCommand]
   private async Task BuildMedia()
   {
@@ -272,10 +353,7 @@ public partial class MainViewModel : ObservableObject
     }
     await RunBusy(async () =>
     {
-      await EnsureWindowsAsync();
-      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
-      var progress = new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 100; Status = step.Text + "..."; });
-      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml, progress);
+      await PrepareMediaAsync(100);
       Status = $"Instalação montada em {MediaDir}.";
       Process.Start(new ProcessStartInfo("explorer.exe", $"\"{MediaDir}\"") { UseShellExecute = true });
     });
@@ -293,10 +371,7 @@ public partial class MainViewModel : ObservableObject
     if (dialog.ShowDialog() != true) return;
     await RunBusy(async () =>
     {
-      await EnsureWindowsAsync();
-      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
-      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
-        new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 90; Status = step.Text + "..."; }));
+      await PrepareMediaAsync(90);
       Status = "Gerando a ISO...";
       await Task.Run(() => IsoWriter.Write(MediaDir, dialog.FileName));
       Status = $"ISO pronta: {dialog.FileName}";
@@ -418,10 +493,7 @@ public partial class MainViewModel : ObservableObject
     }
     await RunBusy(async () =>
     {
-      await EnsureWindowsAsync();
-      byte[] xml = new UnattendBuilder(catalog).BuildBytes(BuildOptions());
-      await MediaBuilder.BuildAsync(esdPath!, MediaDir, "Professional", xml,
-        new Progress<MediaStep>(step => { ProgressValue = step.Fraction * 60; Status = step.Text + "..."; }));
+      await PrepareMediaAsync(60);
       Status = "Copiando drivers de rede, disco e chipset...";
       var drivers = await DriverExporter.ExportAsync(MediaDir);
       var (_, data) = await UsbWriter.WriteAsync(drive, MediaDir,

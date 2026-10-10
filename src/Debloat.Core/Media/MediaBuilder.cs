@@ -54,11 +54,49 @@ public static partial class MediaBuilder
     progress?.Report(new("Pronto", 1));
   }
 
+  /// <summary>
+  /// Mesma mídia a partir de uma pasta de instalação pronta (saída do conversor do UUP dump): copia, deixa só a edição
+  /// pedida no install.wim, divide para FAT32 e põe o autounattend.xml.
+  /// </summary>
+  public static async Task BuildFromFolderAsync(string folder, string mediaDir, string edition, byte[]? autounattend,
+    IProgress<MediaStep>? progress = null, CancellationToken ct = default)
+  {
+    if (Directory.Exists(mediaDir)) Directory.Delete(mediaDir, recursive: true);
+    progress?.Report(new("Copiando a instalação montada", 0.6));
+    await UsbWriter.CopyTreeAsync(folder, mediaDir, Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length),
+      f => progress?.Report(new("Copiando a instalação montada", 0.6 + 0.2 * f)), ct);
+    string sources = Path.Combine(mediaDir, "sources");
+    string installWim = Path.Combine(sources, "install.wim");
+    if (!File.Exists(installWim))
+    {
+      string esd = Path.Combine(sources, "install.esd");
+      int index = await FindEditionIndexAsync(esd, edition, ct, firstIndex: 1);
+      await DismAsync($"/Export-Image /SourceImageFile:\"{esd}\" /SourceIndex:{index} /DestinationImageFile:\"{installWim}\" /Compress:max", ct);
+      File.Delete(esd);
+    }
+    else
+    {
+      int index = await FindEditionIndexAsync(installWim, edition, ct, firstIndex: 1);
+      string only = Path.Combine(sources, "install-only.wim");
+      await DismAsync($"/Export-Image /SourceImageFile:\"{installWim}\" /SourceIndex:{index} /DestinationImageFile:\"{only}\" /Compress:max", ct);
+      File.Delete(installWim);
+      File.Move(only, installWim);
+    }
+    if (new FileInfo(installWim).Length > Fat32Limit)
+    {
+      progress?.Report(new("Dividindo a imagem para caber em FAT32", 0.9));
+      await DismAsync($"/Split-Image /ImageFile:\"{installWim}\" /SWMFile:\"{Path.Combine(sources, "install.swm")}\" /FileSize:3800", ct);
+      File.Delete(installWim);
+    }
+    if (autounattend is not null) await File.WriteAllBytesAsync(Path.Combine(mediaDir, "autounattend.xml"), autounattend, ct);
+    progress?.Report(new("Pronto", 1));
+  }
+
   /// <summary>Procura o índice da edição pelo campo "Edition" (ex.: Professional), que não muda com o idioma.</summary>
-  public static async Task<int> FindEditionIndexAsync(string esdPath, string edition, CancellationToken ct = default)
+  public static async Task<int> FindEditionIndexAsync(string esdPath, string edition, CancellationToken ct = default, int firstIndex = 4)
   {
     string info = await DismAsync($"/Get-WimInfo /WimFile:\"{esdPath}\"", ct);
-    foreach (int index in IndexRegex().Matches(info).Select(m => int.Parse(m.Groups[1].Value)).Where(i => i >= 4))
+    foreach (int index in IndexRegex().Matches(info).Select(m => int.Parse(m.Groups[1].Value)).Where(i => i >= firstIndex))
     {
       string detail = await DismAsync($"/Get-WimInfo /WimFile:\"{esdPath}\" /Index:{index}", ct);
       var match = EditionRegex().Match(detail);

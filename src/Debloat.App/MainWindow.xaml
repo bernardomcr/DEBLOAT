@@ -45,15 +45,25 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel>
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Versão" />
-                <ComboBox ItemsSource="{Binding Releases}" SelectedItem="{Binding SelectedRelease}" />
+                <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}" />
               </StackPanel>
               <StackPanel Grid.Column="2">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Build" />
+                <ComboBox ItemsSource="{Binding Builds}" SelectedItem="{Binding SelectedBuild}" />
+              </StackPanel>
+              <StackPanel Grid.Column="4">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Idioma" />
                 <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" />
               </StackPanel>
+              <ui:Button Grid.Column="6" VerticalAlignment="Bottom" Icon="{ui:SymbolIcon ArrowSync24}" ToolTip="Atualizar"
+                         Command="{Binding RefreshBuildsCommand}" Padding="8" MinHeight="34" />
             </Grid>
             <TextBlock Style="{StaticResource Secondary}" Text="{Binding WindowsVersion}" Margin="0,0,0,8" />
             <ui:Button Content="Baixar" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}" Command="{Binding DownloadWindowsCommand}" Margin="0,0,0,24" />
