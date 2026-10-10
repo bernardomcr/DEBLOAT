@@ -617,6 +617,30 @@ Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $sta
 if( Get-Command sudo.exe -ErrorAction SilentlyContinue ) { sudo.exe config --enable normal | Out-Null }
 #endregion
 
+# --- Modo sem pendrive: apaga a partição temporária DEBLOAT-SETUP e devolve o espaço ao C: ---
+# Fica para o fim de propósito: os instaladores dos apps vieram dela. Só no disco do C: (nunca em outro disco).
+$systemPartition = Get-Partition -DriveLetter $env:SystemDrive[0]
+$setupPartition = Get-Volume -FileSystemLabel 'DEBLOAT-SETUP' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue | Where-Object DiskNumber -eq $systemPartition.DiskNumber
+if( $setupPartition ) {
+	Set-Notice 'Finalizando' 'Devolvendo o espaço da instalação ao disco C:' 100
+	$setupLetter = ($setupPartition | Get-Volume).DriveLetter
+	if( $setupLetter ) { Copy-Item -Path "$($setupLetter):\debloat\*.log", "$($setupLetter):\debloat\*.bak" -Destination $logs -ErrorAction SilentlyContinue }   # registro do WinPE
+	try {
+		$setupPartition | Remove-Partition -Confirm:$false -ErrorAction Stop
+		$max = ($systemPartition | Get-PartitionSupportedSize).SizeMax
+		if( $max -gt $systemPartition.Size ) { $systemPartition | Resize-Partition -Size $max -ErrorAction Stop }
+		Write-Log 'sem-pendrive.log' ("Partição temporária apagada; C: com {0:N0} GB" -f ($max / 1GB))
+	} catch {
+		Write-Log 'sem-pendrive.log' "ERRO ao devolver o espaço ao C: $_"
+	}
+	# Entrada de boot do WinPE que sobrou (descrição começa com DEBLOAT).
+	$entry = $null
+	foreach( $line in (bcdedit.exe /enum all /v) ) {
+		if( $line -match '^(identifier|identificador)\s+(\{[0-9a-fA-F-]{36}\})' ) { $entry = $Matches[2] }
+		if( $line -match '^descri\S*\s+DEBLOAT' -and $entry ) { bcdedit.exe /delete $entry /f | Out-Null; Write-Log 'sem-pendrive.log' "Entrada de boot $entry apagada" }
+	}
+}
+
 #region tweak:ponto-restauracao
 # Depois que tudo foi instalado: é o "voltar ao zero" sem formatar.
 Set-Notice 'Finalizando' 'Criando o ponto de restauração' 100

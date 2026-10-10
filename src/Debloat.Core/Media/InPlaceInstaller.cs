@@ -5,6 +5,7 @@ namespace Debloat.Core.Media;
 /// <summary>
 /// Modo "sem pendrive": cria uma partição temporária DEBLOAT-SETUP (encolhendo o C:), copia a instalação para
 /// ela, prepara um WinPE com o nosso script e agenda UM boot nele. Fluxo completo em PLAN.md.
+/// A partição temporária é apagada no fim do primeiro login (FirstLogon.ps1), depois dos apps — que vêm dela.
 /// NÃO TESTADO EM VM AINDA — a janela não expõe este modo até o teste.
 /// </summary>
 public static partial class InPlaceInstaller
@@ -15,7 +16,7 @@ public static partial class InPlaceInstaller
   /// <summary>Folga além do tamanho da mídia: WinPE, drivers, log.</summary>
   public const long Slack = 2L << 30;
 
-  public record Plan(long MediaSize, long PartitionSize, long FreeOnC, bool BitLockerOn, bool Uefi);
+  public record Plan(long MediaSize, long PartitionSize, long FreeOnC, bool Encrypted, bool Uefi);
 
   public static async Task<Plan> CheckAsync(string mediaDir, CancellationToken ct = default)
   {
@@ -24,7 +25,9 @@ public static partial class InPlaceInstaller
       $c = Get-Partition -DriveLetter $env:SystemDrive[0]
       $s = $c | Get-PartitionSupportedSize
       $bl = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
-      "{0}|{1}|{2}|{3}" -f ($c.Size - $s.SizeMin), [int]($bl.ProtectionStatus -eq 'On'), $env:firmware_type, $c.DiskNumber
+      # Qualquer coisa diferente de "totalmente descriptografado" (inclusive a criptografia automática do Windows 11).
+      $encrypted = [int]($bl -and $bl.VolumeStatus -ne 'FullyDecrypted')
+      "{0}|{1}|{2}|{3}" -f ($c.Size - $s.SizeMin), $encrypted, $env:firmware_type, $c.DiskNumber
       """, ct)).Trim();
     string[] p = json.Split('|');
     return new Plan(media, media + Slack, long.Parse(p[0]), p[1] == "1", p[2] == "UEFI");
@@ -32,8 +35,20 @@ public static partial class InPlaceInstaller
 
   public static async Task PrepareAsync(string mediaDir, IProgress<WriteStep>? progress = null, CancellationToken ct = default)
   {
+    if (!File.Exists(Path.Combine(mediaDir, "boot", "boot.sdi")) || !File.Exists(Path.Combine(mediaDir, "sources", "boot.wim")))
+    {
+      throw new InvalidOperationException("A instalação montada está incompleta (boot.sdi/boot.wim).");
+    }
+    // Drivers de rede, disco e chipset DESTE PC: sem eles o WinPE pode nem ver o SSD (Intel VMD/RST).
+    if (!Directory.Exists(Path.Combine(mediaDir, DriverExporter.FolderName)))
+    {
+      progress?.Report(new("Copiando drivers de rede, disco e chipset", 0.01));
+      await DriverExporter.ExportAsync(mediaDir, ct);
+    }
     var plan = await CheckAsync(mediaDir, ct);
     if (!plan.Uefi) throw new InvalidOperationException("O modo sem pendrive só funciona em PCs com UEFI. Use o pendrive.");
+    // Com o disco criptografado o WinPE não lê o C: (não acharia o Windows antigo). Melhor avisar agora.
+    if (plan.Encrypted) throw new InvalidOperationException("O disco C: está criptografado (BitLocker/criptografia do dispositivo). Desligue a criptografia ou use o pendrive.");
     if (plan.FreeOnC < plan.PartitionSize + (10L << 30)) throw new InvalidOperationException("Pouco espaço livre no C: para a partição temporária.");
 
     string token = System.Guid.NewGuid().ToString("N");
@@ -41,9 +56,15 @@ public static partial class InPlaceInstaller
     // Marcador no C: atual: o WinPE só formata a partição que tem este token.
     await File.WriteAllTextAsync(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory)!, "DEBLOAT-ALVO.txt"), token, ct);
     char s = (await PowerShell.RunAsync($$"""
-      $old = Get-Volume -FileSystemLabel '{{SetupLabel}}' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue
-      if( $old ) { $old | Remove-Partition -Confirm:$false }
       $c = Get-Partition -DriveLetter $env:SystemDrive[0]
+      # Sobra de uma tentativa anterior: apaga e devolve o espaço ao C: antes de encolher de novo.
+      $old = Get-Volume -FileSystemLabel '{{SetupLabel}}' -ErrorAction SilentlyContinue | Get-Partition -ErrorAction SilentlyContinue | Where-Object DiskNumber -eq $c.DiskNumber
+      if( $old ) {
+        $old | Remove-Partition -Confirm:$false
+        $max = ($c | Get-PartitionSupportedSize).SizeMax
+        if( $max -gt $c.Size ) { $c | Resize-Partition -Size $max }
+        $c = Get-Partition -DriveLetter $env:SystemDrive[0]
+      }
       $c | Resize-Partition -Size ($c.Size - {{plan.PartitionSize}})
       $p = New-Partition -DiskNumber $c.DiskNumber -Size {{plan.PartitionSize}} -AssignDriveLetter
       Format-Volume -Partition $p -FileSystem NTFS -NewFileSystemLabel '{{SetupLabel}}' -Confirm:$false | Out-Null
@@ -56,18 +77,11 @@ public static partial class InPlaceInstaller
 
     string debloat = Directory.CreateDirectory(Path.Combine(root, "debloat")).FullName;
     await File.WriteAllTextAsync(Path.Combine(debloat, "alvo.txt"), token, ct);
-    await File.WriteAllTextAsync(Path.Combine(debloat, "SetupComplete.cmd"), Resources.Script("InPlace-SetupComplete.cmd"), ct);
-    await File.WriteAllTextAsync(Path.Combine(debloat, "limpar-particao.ps1"), Resources.Script("InPlace-limpar-particao.ps1"), ct);
 
     progress?.Report(new("Preparando o ambiente de instalação (WinPE)", 0.7));
     await BuildWinPeAsync(root, ct);
 
     progress?.Report(new("Agendando o boot de instalação", 0.9));
-    if (plan.BitLockerOn)
-    {
-      // Sem isso, a mudança no boot faz o PC pedir a chave de recuperação.
-      await PowerShell.RunAsync("Suspend-BitLocker -MountPoint $env:SystemDrive -RebootCount 2 | Out-Null", ct);
-    }
     await AddBootEntryAsync(s, ct);
     progress?.Report(new("Pronto: reinicie para formatar e instalar", 1));
   }

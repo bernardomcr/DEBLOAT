@@ -150,3 +150,36 @@ public class SaveTests
     Assert.Contains("CODEX / PLAZA", verified);
   }
 }
+
+public class InPlaceSafetyTests
+{
+  private static readonly string Script = Debloat.Core.Resources.Script("InPlace-instalar.cmd");
+
+  [Theory]
+  [InlineData("if not exist \"%IMG%\" (")]
+  [InlineData(@"if not exist ""%SRC%\autounattend.xml""")]
+  [InlineData("bcdboot.exe\" (")]
+  [InlineData("mountvol %ESP% /s")]
+  [InlineData(@"if not exist %ESP%\EFI\Microsoft\Boot")]
+  public void Tudo_e_conferido_antes_de_formatar(string check)
+  {
+    int at = Script.IndexOf(check, StringComparison.Ordinal);
+    Assert.True(at > 0, check);
+    Assert.True(at < Script.IndexOf("format %TGT%", StringComparison.Ordinal), $"'{check}' tem que vir antes do format");
+  }
+
+  [Fact]
+  public void Menu_de_boot_so_perde_as_entradas_da_particao_formatada()
+  {
+    Assert.Contains("if /i \"%%b\"==\"partition=%TGT%\" if /i not \"!ID!\"==\"{default}\" bcdedit /delete !ID! /f", Script);
+    Assert.DoesNotContain("/timeout", Script);
+  }
+
+  [Fact]
+  public void Limpeza_no_primeiro_login_so_no_disco_do_C_e_depois_dos_apps()
+  {
+    string firstLogon = Debloat.Core.Resources.Script("FirstLogon.ps1");
+    Assert.Contains("Get-Partition -ErrorAction SilentlyContinue | Where-Object DiskNumber -eq $systemPartition.DiskNumber", firstLogon);
+    Assert.True(firstLogon.IndexOf("$setupPartition | Remove-Partition", StringComparison.Ordinal) > firstLogon.IndexOf("FIM da lista de apps", StringComparison.Ordinal));
+  }
+}
