@@ -172,6 +172,17 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 6. "Introdução" ainda aparece nas recomendações do Iniciar (HideRecommendedSection por máquina e por
    usuário e Start_TrackProgs não bastaram). Cosmético; investigar.
 
+## Vídeo (10/10/2026)
+
+- **Limpeza do vídeo:** o DriverExporter nunca leva drivers de vídeo para o pendrive (só Net, disco, USB
+  e chipset): a instalação começa sem driver de vídeo nenhum e o Windows Update instala o WHQL atual
+  da NVIDIA/AMD/Intel. Nenhum fabricante publica driver de vídeo no winget.
+- **Taxa máxima** (ajuste `taxa-maxima`, padrão no desktop): tarefa "DEBLOAT-taxa-maxima" por usuário
+  (no login e a cada 15 min por 3 dias, via `conhost --headless`, sem janela) que põe cada monitor na
+  maior taxa da resolução atual; para quando nenhuma placa PCI está no "Basic Display" (marca em
+  HKCU\Software\DEBLOAT). Log em %LOCALAPPDATA%\DEBLOAT-taxa.log. Simulado no PC do usuário (RTX 5070 Ti
+  já em 180 Hz; tela do iGPU 59 → 60 Hz) em PowerShell 5.1 e 7.
+
 ## Teste em VM (09/10/2026) — `tools/VmTest`
 
 Hyper-V, Geração 2, Secure Boot + TPM, disco de 80 GB, pendrive simulado por ISO (modo `WipeDisk0`).

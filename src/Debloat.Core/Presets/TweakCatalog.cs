@@ -158,6 +158,7 @@ public static class TweakCatalog
     // Mais sistema
     new("sem-animacoes", "Sistema", "Sem animações de janela e menus", "Fica mais ágil e mantém fontes suaves e miniaturas", false),
     new("desktop-sem-suspensao", "Sistema", "Nunca suspender sozinho", "A tela ainda desliga; bom para downloads e servidores de jogos", hw => !hw.HasBattery),
+    new("taxa-maxima", "Sistema", "Monitor na taxa de atualização máxima", "No notebook gasta mais bateria", hw => !hw.HasBattery),
     new("sem-nomes-8dot3", "Sistema", "Sem nomes curtos 8.3 no NTFS", "Pastas com muitos arquivos ficam mais rápidas", true),
     new("sem-compatibilidade", "Sistema", "Desligar mecanismo de compatibilidade e SwitchBack", "Programas e jogos antigos podem parar de abrir", false, aggressive: true),
     new("sem-restauracao", "Sistema", "Desligar Proteção do Sistema (pontos de restauração)", "Sem como voltar o Windows sem formatar", false, aggressive: true),
