@@ -58,18 +58,33 @@ $form.Controls.AddRange( @( $title, $detail, $track ) )
 # Aberto com janela oculta, o Windows esconderia o aviso também: mostra sem tirar o foco de quem estiver usando.
 Add-Type -Namespace Debloat -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);'
 $form.Add_Shown( { [Debloat.Win]::ShowWindow( $form.Handle, 4 ) | Out-Null } )
+# A barra é do item atual: um trecho correndo enquanto ele instala (instalador não informa porcentagem;
+# -1 = correndo, 100 = cheia no fim). Se ela anda, está vivo, mesmo que um app demore.
+$script:tick = 0
+$script:percent = 0
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 700
+$timer.Interval = 40
 $timer.Add_Tick( {
-	# Fecha sozinho se o script principal morrer: o aviso nunca fica preso na tela.
-	if( -not (Get-Process -Id $Parent -ErrorAction SilentlyContinue) ) { $form.Close(); return }
-	try {
-		$lines = [System.IO.File]::ReadAllLines( $Status )
-		if( $lines[0] -eq 'FIM' ) { $form.Close(); return }
-		$title.Text = $lines[0]
-		$detail.Text = $lines[1]
-		$bar.Width = [int] ($track.Width * [Math]::Min( 100, [int] $lines[2] ) / 100)
-	} catch { }
+	$script:tick++
+	if( $script:tick % 12 -eq 1 ) {
+		# Fecha sozinho se o script principal morrer: o aviso nunca fica preso na tela.
+		if( -not (Get-Process -Id $Parent -ErrorAction SilentlyContinue) ) { $form.Close(); return }
+		try {
+			$lines = [System.IO.File]::ReadAllLines( $Status )
+			if( $lines[0] -eq 'FIM' ) { $form.Close(); return }
+			$title.Text = $lines[0]
+			$detail.Text = $lines[1]
+			$script:percent = [int] $lines[2]
+		} catch { }
+	}
+	if( $script:percent -ge 0 ) {
+		$bar.Left = 0
+		$bar.Width = [int] ($track.Width * [Math]::Min( 100, $script:percent ) / 100)
+	} else {
+		$segment = [int] ($track.Width / 4)
+		$bar.Width = $segment
+		$bar.Left = (($script:tick * 5) % ($track.Width + $segment)) - $segment
+	}
 } )
 $timer.Start()
 [System.Windows.Forms.Application]::Run( $form )
@@ -383,8 +398,8 @@ function Initialize-Online {
 }
 
 function Enable-FromMedia([string] $Feature) {
-	# Recursos como o .NET 3.5 vêm da pasta sources\sxs do pendrive, sem internet.
-	foreach( $drive in [System.IO.DriveInfo]::GetDrives() ) {
+	# Recursos como o .NET 3.5 vêm da pasta sources\sxs do pendrive, sem internet (leva uns 5 min).
+	foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 		$sxs = Join-Path $drive.RootDirectory 'sources\sxs'
 		if( Test-Path -LiteralPath $sxs ) {
 			Enable-WindowsOptionalFeature -Online -FeatureName $Feature -Source $sxs -NoRestart -All -ErrorAction Stop | Out-Null
@@ -409,22 +424,12 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 	}
 }
 
-# Recursos do Windows (.NET 3.5) são ativados pelo sistema e levam ~5 min: rodam em paralelo com a lista.
-$featureJobs = @( $apps | Where-Object source -eq 'feature' | ForEach-Object {
-	Write-Log 'apps.log' "Instalando $($_.name) em paralelo..."
-	Start-Job -Name $_.name -ArgumentList ${function:Enable-FromMedia}.ToString(), $_.package -ScriptBlock {
-		param( [string] $Body, [string] $Feature )
-		& ([scriptblock]::Create( $Body )) $Feature
-	}
-} )
-
 if( $apps.Count -gt 0 ) {
 	$index = 0
 	foreach( $app in $apps ) {
-		if( $app.source -eq 'feature' ) { $index++; continue }
 		Close-NewWindows   # o que o app anterior abriu
 		$index++
-		Set-Notice "Instalando apps: $index de $($apps.Count)" $app.name ([int] (100 * ($index - 1) / $apps.Count))
+		Set-Notice "Instalando apps: $index de $($apps.Count)" $app.name -1
 		Write-Log 'apps.log' "Instalando $($app.name)..."
 		if( $offline.ContainsKey( $app.id ) ) {
 			try {
@@ -437,6 +442,10 @@ if( $apps.Count -gt 0 ) {
 		Initialize-Online
 		try {
 			switch( $app.source ) {
+				'feature' {
+					Enable-FromMedia $app.package
+					Write-Log 'apps.log' "  recurso do Windows ativado"
+				}
 				'winget' {
 					$wingetArgs = @( 'install', '--exact', '--id', $app.package, '--source', 'winget', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' )
 					# --force: sem ele o x86 é pulado ("No available upgrade found") porque o x64 de mesmo ID já está instalado.
@@ -480,16 +489,6 @@ if( $apps.Count -gt 0 ) {
 	}
 }
 
-foreach( $job in $featureJobs ) {
-	Set-Notice 'Finalizando' $job.Name 100
-	Wait-Job -Job $job | Out-Null
-	if( $job.State -eq 'Completed' ) {
-		Write-Log 'apps.log' "$($job.Name): recurso do Windows ativado"
-	} else {
-		Write-Log 'apps.log' "$($job.Name): ERRO $($job.ChildJobs[0].JobStateInfo.Reason)"
-	}
-	Remove-Job -Job $job -Force
-}
 Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
 if( $apps.Count -gt 0 ) {
 	# Alguns abrem a janela só depois de se atualizarem (o Discord leva uns segundos).

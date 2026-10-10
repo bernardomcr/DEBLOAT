@@ -151,7 +151,8 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 ## Próximas tarefas combinadas (09/10/2026)
 
 1. ✅ **Aviso na tela no primeiro login** (10/10/2026): janelinha escura no canto inferior direito,
-   sempre por cima e sem roubar o foco ("Instalando apps: 12 de 48 — Google Chrome" + barra). Processo
+   sempre por cima e sem roubar o foco ("Instalando apps: 12 de 48", nome do app e uma barra correndo
+   que é do app atual; sem porcentagem nem tempo, a pedido do usuário). O .NET 3.5 fica na fila, junto. Processo
    separado que lê C:\Debloat\progresso.txt; fecha sozinho no fim ou se o script principal morrer.
 2. ✅ **Fechar as janelas de boas-vindas**: antes de cada app e 15 s depois do último, manda WM_CLOSE
    (como clicar no X) às janelas de processos que não existiam no início do script. Apps de bandeja
