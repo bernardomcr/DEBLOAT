@@ -210,6 +210,7 @@ try
           kb.InvokeMethod("PressKey", [0x5B]); kb.InvokeMethod("TypeKey", [0x52]); kb.InvokeMethod("ReleaseKey", [0x5B]);
           break;
         case "{SHIFT}": kb.InvokeMethod("TypeKey", [0x10]); break;     // acorda a tela
+        case "{WIN}": kb.InvokeMethod("TypeKey", [0x5B]); break;       // abre/fecha o Iniciar
         case "{ENTER}": kb.InvokeMethod("TypeKey", [0x0D]); break;
         case "{ESC}": kb.InvokeMethod("TypeKey", [0x1B]); break;
         case "{WAIT}": await Task.Delay(5000); break;
