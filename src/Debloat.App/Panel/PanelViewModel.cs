@@ -50,7 +50,7 @@ public partial class PanelApp(string id, string name) : ObservableObject
   [RelayCommand]
   private void Pin()
   {
-    if (StartMenu.Pin(StartId)) CanPin = false;
+    if (StartMenu.Pin(StartId, Name)) CanPin = false;
   }
 }
 
@@ -145,7 +145,7 @@ public partial class PanelViewModel : ObservableObject
         if (StartMenu.Match(app.Name, entries) is { } entry)
         {
           app.StartId = entry.Id;
-          app.CanPin = StartMenu.CanPin(entry.Id);
+          app.CanPin = StartMenu.CanPin(entry.Id, app.Name);
         }
       }
     }

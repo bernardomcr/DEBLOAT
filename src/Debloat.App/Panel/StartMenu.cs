@@ -67,17 +67,21 @@ public static class StartMenu
     return byWord.Count == 1 ? byWord[0] : null;
   }
 
-  public static bool CanPin(string startId) => PinVerb(startId) is not null;
+  public static bool CanPin(string startId, string appName) => PinVerb(startId, appName) is not null;
 
-  public static bool Pin(string? startId)
+  public static bool Pin(string? startId, string appName)
   {
-    if (startId is null || PinVerb(startId) is not { } verb) return false;
+    if (startId is null || PinVerb(startId, appName) is not { } verb) return false;
     verb.DoIt();
     return true;
   }
 
-  /// <summary>O Windows só oferece "Fixar em Iniciar" para alguns apps (não há API oficial para fixar).</summary>
-  private static dynamic? PinVerb(string startId)
+  /// <summary>
+  /// O "Fixar em Iniciar" do próprio Windows (não há API oficial para fixar). Na lista de apps ele só aparece para
+  /// alguns (Telegram, Steam, VLC sim; Chrome, Firefox, Discord não); no atalho (.lnk) do app no Iniciar aparece para
+  /// todos — então o atalho é o plano B.
+  /// </summary>
+  private static dynamic? PinVerb(string startId, string appName)
   {
     try
     {
@@ -85,19 +89,46 @@ public static class StartMenu
       foreach (dynamic item in shell.Namespace(AppsFolder).Items())
       {
         if ((string)item.Path != startId) continue;
-        foreach (dynamic verb in item.Verbs())
-        {
-          string name = ((string)verb.Name).Replace("&", "");
-          bool pin = name.Contains("Fixar", StringComparison.OrdinalIgnoreCase) || name.Contains("Pin to", StringComparison.OrdinalIgnoreCase);
-          bool start = name.Contains("Iniciar", StringComparison.OrdinalIgnoreCase) || name.Contains("Start", StringComparison.OrdinalIgnoreCase);
-          bool unpin = name.Contains("Desafixar", StringComparison.OrdinalIgnoreCase) || name.Contains("Unpin", StringComparison.OrdinalIgnoreCase);
-          if (pin && start && !unpin) return verb;
-        }
-        return null;
+        if (PinVerbOf(item) is { } verb) return verb;
+        break;
+      }
+      if (Shortcut(appName) is { } lnk)
+      {
+        dynamic file = shell.Namespace(Path.GetDirectoryName(lnk)).ParseName(Path.GetFileName(lnk));
+        return file is null ? null : PinVerbOf(file);
       }
     }
     catch (Exception e) when (e is System.Runtime.InteropServices.COMException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException) { }
     return null;
+  }
+
+  private static dynamic? PinVerbOf(dynamic item)
+  {
+    foreach (dynamic verb in item.Verbs())
+    {
+      string name = ((string)verb.Name).Replace("&", "");
+      bool pin = name.Contains("Fixar", StringComparison.OrdinalIgnoreCase) || name.Contains("Pin to", StringComparison.OrdinalIgnoreCase);
+      bool start = name.Contains("Iniciar", StringComparison.OrdinalIgnoreCase) || name.Contains("Start", StringComparison.OrdinalIgnoreCase);
+      bool unpin = name.Contains("Desafixar", StringComparison.OrdinalIgnoreCase) || name.Contains("Unpin", StringComparison.OrdinalIgnoreCase);
+      if (pin && start && !unpin) return verb;
+    }
+    return null;
+  }
+
+  /// <summary>Atalho do app nas pastas do Iniciar (todos os usuários e o atual), achado pelo nome.</summary>
+  private static string? Shortcut(string appName)
+  {
+    var shortcuts = new[]
+    {
+      Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms),
+      Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+    }
+    .Where(Directory.Exists)
+    .SelectMany(d => Directory.EnumerateFiles(d, "*.lnk", SearchOption.AllDirectories))
+    .Select(f => new Entry(Path.GetFileNameWithoutExtension(f), f))
+    .Where(e => !NotTheApp.Any(w => e.Name.Contains(w, StringComparison.OrdinalIgnoreCase)))
+    .ToList();
+    return Match(appName, shortcuts)?.Id;
   }
 
   private static string Normalize(string name) => new(name.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
