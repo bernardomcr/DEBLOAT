@@ -16,13 +16,16 @@ pensado item por item, que dá para ajustar à vontade, ou usar sem mexer em nad
 ## O que ele faz
 
 - **Windows 11 oficial:** a versão pronta da Microsoft (ou, em teste, qualquer build via UUP dump), em português ou inglês.
-- **Instalação sem perguntas:** pendrive ou ISO que formata e instala sozinho, com conta local sem senha.
+- **Instalação sem perguntas:** pendrive ou ISO que formata e instala sozinho, com conta local sem senha — ou
+  **sem pendrive**: o DEBLOAT prepara uma partição temporária no próprio disco, reinicia e reinstala, e depois
+  devolve o espaço ao C:.
 - **Debloat:** remove Copilot, Recall, Teams, Clipchamp, propaganda, telemetria e mais de 60 apps; mais de
   100 ajustes (privacidade, Explorer, Iniciar, Windows Update, jogos) com um preset recomendado.
-- **Apps já instalados:** os instaladores vão dentro do pendrive/ISO; o primeiro login só instala, com um
-  aviso no canto da tela. 140+ apps, incluindo todos os runtimes de jogos (.NET, VC++, DirectX, XNA...).
-- **Backup:** saves de jogos (Ludusavi e cracks), Wi-Fi, navegadores, ShareX e pastas que você escolher,
-  restaurados depois da instalação.
+- **Apps já instalados:** os instaladores vão dentro do pendrive/ISO; o primeiro login só instala (~7 min para o
+  preset, em filas paralelas), com um aviso no canto que abre a lista dos apps — cada um com Abrir e, quando o
+  Windows deixa, Fixar no Iniciar. 140+ apps, incluindo todos os runtimes de jogos (.NET, VC++, DirectX, XNA...).
+- **Backup:** saves de jogos (Ludusavi e cracks), Wi-Fi, navegadores, ShareX, pastas que você escolher e os
+  programas deste PC (pelo winget, ou levando a pasta dos portáteis), restaurados depois da instalação.
 - **Drivers:** leva os de rede, disco e chipset do seu PC para a instalação; o de vídeo vem limpo pelo
   Windows Update, e o monitor fica na taxa de atualização máxima.
 

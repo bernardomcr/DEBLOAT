@@ -148,6 +148,23 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
    seguir: se houver outro disco com espaço, a partição temporária vai nele e o disco do Windows pode
    ser zerado inteiro. Para testar em VM: gerar ISO (IMAPI2, `efisys.bin`) — Hyper-V não boota pendrive.
 
+## Estado da V1 (10/10/2026)
+
+**Testado na VM (Hyper-V, Secure Boot + TPM):** pendrive/ISO do zero com o preset (sem perguntas, 53 apps em
+~7 min, nada trava, janelas de boas-vindas fechadas); modo sem pendrive de ponta a ponta; painel do primeiro
+login (aviso + lista); catálogo inteiro (147 apps) numa rodada — ver resultado abaixo.
+**Testado só no PC host (sem VM):** detecção de programas do backup; lista do painel com Abrir.
+**Não testado / conhecido:**
+- Builds do UUP dump (download + conversão) — marcado "em teste" no README.
+- Backup e restauração de um programa (winget ou pasta) de ponta a ponta.
+- Busca escondida pela política SearchOnTaskbarMode (entrou depois da última rodada).
+- "Introdução" ainda aparece nas recomendações do Iniciar.
+- Apps fora do preset podem abrir janelas sozinhos depois de instalar (Riot Client pede firewall, Playnite
+  abre a biblioteca) — prioridade baixa, a pedido do usuário.
+- Fixar no Iniciar: o Windows só oferece para alguns apps (Telegram, ShareX, VLC, Steam, WhatsApp sim;
+  Chrome, Firefox, Discord, PowerToys não) — o painel mostra o botão só onde funciona.
+- .NET 3.5 na imagem: o DISM do host não serviça o install.wim montado; segue no primeiro login, em paralelo.
+
 ## Modo sem pendrive — testado na VM (10/10/2026)
 
 Funcionou de ponta a ponta: preparação (partição DEBLOAT-SETUP, cópia, WinPE, boot de uso único) → reinício
