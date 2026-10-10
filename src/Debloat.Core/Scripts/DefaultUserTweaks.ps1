@@ -7,6 +7,12 @@ function Set-UserValue([string] $Key, [string] $Name, [int] $Value) {
 
 $adv = 'Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
 
+#region busca-escondida
+# Busca escondida (o Everything Toolbar entra no lugar): o gerador grava SearchboxTaskbarMode = 0, mas o Windows 25H2
+# também guarda um cache que ficava em 1 e mantinha a caixa "Pesquisar" na barra (VM, 10/10/2026).
+Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\Search' 'SearchboxTaskbarModeCache' 0
+#endregion
+
 #region tweak:propagandas-usuario
 Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement' 'ScoobeSystemSettingEnabled' 0   # "Vamos terminar de configurar"
 Set-UserValue $adv 'ShowSyncProviderNotifications' 0     # anúncios do OneDrive no Explorer

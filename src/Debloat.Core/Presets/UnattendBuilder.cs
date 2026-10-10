@@ -141,6 +141,7 @@ public sealed class UnattendBuilder
       : options.EffectiveTweaks;
     string associations = Associations(vlc, options.Has("visualizador-fotos"));
     var named = associations.Length > 0 ? new HashSet<string> { "associacoes" } : new HashSet<string>();
+    if (apps.Any(a => a.Id == "everything-toolbar")) named.Add("busca-escondida");
 
     var scripts = new List<Script>
     {
