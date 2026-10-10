@@ -157,10 +157,12 @@ try
         }
         $result | Out-File '{{output}}' -Encoding UTF8
         if( ($result -join "`n") -notmatch 'SAIDA=0' ) { throw "O InPlaceRun falhou; veja {{output}}" }
+        # Reinício normal, por dentro do Windows: o Restart-VM -Force é um reset e as mudanças no menu de boot
+        # (ainda só na memória) se perdiam (VM, 10/10/2026).
+        Invoke-Command -Session $s -ScriptBlock { shutdown.exe /r /t 3 }
       } finally {
         Remove-PSSession $s
       }
-      Restart-VM -Name '{{VmName}}' -Force
       """);
     Log($"InPlaceRun OK (saída em {output}); VM reiniciada no WinPE");
     var inPlaceScope = new ManagementScope(@"\\.\root\virtualization\v2");
