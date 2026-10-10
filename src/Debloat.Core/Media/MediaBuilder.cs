@@ -65,6 +65,7 @@ public static partial class MediaBuilder
     progress?.Report(new("Copiando a instalação montada", 0.6));
     await UsbWriter.CopyTreeAsync(folder, mediaDir, Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length),
       f => progress?.Report(new("Copiando a instalação montada", 0.6 + 0.2 * f)), ct);
+    File.Delete(Path.Combine(mediaDir, "__chunk_data"));   // sobra do conversor; a mídia oficial não tem
     string sources = Path.Combine(mediaDir, "sources");
     string installWim = Path.Combine(sources, "install.wim");
     if (!File.Exists(installWim))

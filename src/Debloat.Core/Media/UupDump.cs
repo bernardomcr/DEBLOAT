@@ -75,6 +75,8 @@ public static partial class UupDump
     IProgress<MediaStep>? progress = null, CancellationToken ct = default)
   {
     Directory.CreateDirectory(workDir);
+    // Já convertida antes (ex.: falhou depois, na montagem da mídia): usa direto, sem baixar e converter de novo.
+    if (Converted(workDir) is { } ready) return ready;
     progress?.Report(new("Baixando o conversor do UUP dump", 0.01));
     string converter = await GetConverterAsync(http, build.Uuid, language, workDir, ct);
     string uups = Directory.CreateDirectory(Path.Combine(converter, "UUPs")).FullName;   // onde o convert-UUP.cmd procura
@@ -122,12 +124,20 @@ public static partial class UupDump
     await pump;
     await log.DisposeAsync();
 
-    string iso = Path.Combine(converter, "ISOFOLDER");
-    if (!File.Exists(Path.Combine(iso, "sources", "install.wim")) && !File.Exists(Path.Combine(iso, "sources", "install.esd")))
-    {
-      throw new InvalidOperationException($"O conversor não gerou a instalação. Veja {Path.Combine(workDir, "conversor.log")}.");
-    }
-    return iso;
+    return Converted(workDir) ?? throw new InvalidOperationException($"O conversor não gerou a instalação. Veja {Path.Combine(workDir, "conversor.log")}.");
+  }
+
+  /// <summary>
+  /// Pasta de instalação que o conversor gerou. Com "sem ISO" ela não se chama ISOFOLDER, e sim o nome da build
+  /// (ex.: 26100.1.240331-1435.GE_RELEASE_CLIENTPRO_OEMRET_X64FRE_PT-BR) — por isso a busca é pelo conteúdo.
+  /// </summary>
+  private static string? Converted(string workDir)
+  {
+    string converter = Path.Combine(workDir, "conversor");
+    if (!Directory.Exists(converter)) return null;
+    return Directory.EnumerateDirectories(converter).FirstOrDefault(d =>
+      File.Exists(Path.Combine(d, "setup.exe")) && File.Exists(Path.Combine(d, "sources", "boot.wim"))
+      && (File.Exists(Path.Combine(d, "sources", "install.wim")) || File.Exists(Path.Combine(d, "sources", "install.esd"))));
   }
 
   /// <summary>Conversor do pacote oficial do UUP dump: URLs e SHA-256 lidos do próprio pacote (não ficam fixos aqui).</summary>
