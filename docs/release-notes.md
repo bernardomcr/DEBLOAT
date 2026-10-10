@@ -1,13 +1,12 @@
-Primeira versão do DEBLOAT!
+DEBLOAT! 1.1.0
 
-- Baixa o Windows 11 oficial da Microsoft (25H2/24H2), em português ou inglês; builds do UUP dump em teste.
-- Grava pendrive, gera ISO ou reinstala sem pendrive (partição temporária no próprio disco); só pergunta
-  em qual disco instalar, com conta local sem senha.
-- Preset recomendado com mais de 100 ajustes e mais de 60 apps removidos, tudo ajustável na aba Debloat.
-- Instaladores dos apps dentro da mídia: o primeiro login só instala (~7 min para o preset), com um aviso no
-  canto que abre a lista dos apps (Abrir e Fixar no Iniciar).
-- Backup e restauração de saves de jogos, Wi-Fi, navegadores, ShareX, pastas e programas deste PC.
-- Drivers de rede, disco e chipset do PC na instalação; monitor na taxa de atualização máxima.
+- Desfazer ajuste por ajuste no Windows instalado: atalho "DEBLOAT - Ajustes" no Iniciar.
+- NVIDIA App ou AMD Adrenalin no preset conforme a placa de vídeo do PC.
+- Aviso quando sai versão nova do DEBLOAT.
+- Tempo restante ao gravar o pendrive, com aviso quando a porta é USB 2.0.
+- UniGetUI não aparece mais como erro na lista de apps.
+- Reinstalar sem pendrive: os drivers de disco (NVMe/RAID) também são carregados no boot, para PCs onde o
+  Windows não consegue injetá-los antes.
 
 Abra como administrador. O SmartScreen avisa porque o programa não tem certificado de assinatura.
 Gravar o pendrive apaga tudo nele, e a instalação apaga o disco do PC onde rodar.
