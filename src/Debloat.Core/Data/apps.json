@@ -119,6 +119,7 @@
     {"id": "xnview", "name": "XnView MP", "category": "imaging", "source": "winget", "package": "XnSoft.XnViewMP", "default": false},
     {"id": "faststone", "name": "FastStone Image Viewer", "category": "imaging", "source": "winget", "package": "FastStone.Viewer", "default": false},
     {"id": "greenshot", "name": "Greenshot", "category": "imaging", "source": "winget", "package": "Greenshot.Greenshot", "default": false},
+    {"id": "photocraft", "name": "PhotoCraft", "category": "imaging", "source": "github", "package": "storytold/photocraft", "asset": "windows-x64\\.msi$", "args": "/qn /norestart", "default": true, "description": "Editor de fotos (ArtCraft)"},
 
     {"id": "libreoffice", "name": "LibreOffice", "category": "docs", "source": "winget", "package": "TheDocumentFoundation.LibreOffice", "default": false},
     {"id": "sumatra", "name": "SumatraPDF", "category": "docs", "source": "winget", "package": "SumatraPDF.SumatraPDF", "default": false},
