@@ -325,7 +325,7 @@ try
 
   Log("Criando a VM");
   await Ps($$"""
-    New-VM -Name '{{VmName}}' -Generation 2 -MemoryStartupBytes 6GB -NewVHDPath '{{vhd}}' -NewVHDSizeBytes 80GB -SwitchName 'Default Switch' | Out-Null
+    New-VM -Name '{{VmName}}' -Generation 2 -MemoryStartupBytes 6GB -NewVHDPath '{{vhd}}' -NewVHDSizeBytes {{(allApps ? 160 : 80)}}GB -SwitchName 'Default Switch' | Out-Null
     Set-VMMemory -VMName '{{VmName}}' -DynamicMemoryEnabled $false
     Set-VMProcessor -VMName '{{VmName}}' -Count 4
     Set-VMFirmware -VMName '{{VmName}}' -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows

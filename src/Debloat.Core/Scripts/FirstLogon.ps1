@@ -433,7 +433,7 @@ function Install-Downloaded([string] $File, [string] $Arguments) {
 		return -1
 	}
 	Write-Log 'apps.log' "  instalador saiu com $($p.ExitCode)"
-	Remove-Item -LiteralPath $File -ErrorAction SilentlyContinue
+	if( -not ($script:keepInstallers -and $File.StartsWith( $script:offlineDir )) ) { Remove-Item -LiteralPath $File -ErrorAction SilentlyContinue }
 	return $p.ExitCode
 }
 
@@ -465,7 +465,7 @@ function Install-Offline($Item) {
 	if( $Item.kind -eq 'msix' ) {
 		Add-AppxPackage -Path $file -ErrorAction Stop
 		Write-Log 'apps.log' '  instalado da mídia'
-		Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+		if( -not $script:keepInstallers ) { Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue }
 		return $true
 	}
 	$code = Install-Downloaded $file $Item.args
@@ -508,6 +508,7 @@ function Enable-FromMedia([string] $Feature) {
 # Instaladores que o DEBLOAT já pôs no pendrive/ISO. Copia antes: o pendrive pode ser tirado no meio.
 $offline = @{}
 $offlineDir = "$env:SystemDrive\Debloat\instaladores"
+$keepInstallers = $false   # true = instalando direto da mídia: os instaladores dela não são apagados
 $onlineReady = $false
 $winget = $null
 foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
@@ -520,7 +521,17 @@ foreach( $drive in [System.IO.DriveInfo]::GetDrives() | Where-Object IsReady ) {
 			Write-Log 'apps.log' "Os instaladores da mídia têm $age dias: baixando as versões novas pela internet"
 			break
 		}
-		robocopy.exe $source $offlineDir /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+		# Copia para o C: (o pendrive pode ser tirado no meio) só com folga: com o catálogo inteiro são uns 15 GB e
+		# um SSD pequeno enchia (VM, 10/10/2026). Sem folga, instala direto da mídia e não apaga nada dela.
+		$need = (Get-ChildItem -LiteralPath $source -Recurse -File | Measure-Object -Property Length -Sum).Sum
+		$free = (Get-PSDrive -Name $env:SystemDrive[0]).Free
+		if( $free -gt $need + 30GB ) {
+			robocopy.exe $source $offlineDir /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+		} else {
+			$offlineDir = $source
+			$keepInstallers = $true
+			Write-Log 'apps.log' ("Pouco espaço no {0} para copiar os instaladores: instalando direto da mídia" -f $env:SystemDrive)
+		}
 		foreach( $item in (Get-Content -LiteralPath "$offlineDir\offline.json" -Raw | ConvertFrom-Json) ) { $offline[$item.id] = $item }
 		Write-Log 'apps.log' "$($offline.Count) instaladores vieram na mídia ($($drive.Name))"
 		break
@@ -608,7 +619,7 @@ function Start-Parallel {
 			if( $item.kind -eq 'msix' ) {
 				Add-AppxPackage -Path $file -ErrorAction Stop
 				Write-Log 'apps.log' "  $($app.name): instalado da mídia"
-				Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue
+				if( -not $script:keepInstallers ) { Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue }
 				Set-AppState $app.id 'pronto'
 				$script:done++
 				continue
@@ -641,7 +652,7 @@ function Receive-Parallel {
 		$code = $job.Process.ExitCode
 		if( $code -in (@( 0, 1641, 3010 ) + @( $job.Item.successCodes )) ) {
 			Write-Log 'apps.log' "  $($job.App.name): instalador saiu com $code"
-			Remove-Item -LiteralPath $job.File -ErrorAction SilentlyContinue
+			if( -not $script:keepInstallers ) { Remove-Item -LiteralPath $job.File -ErrorAction SilentlyContinue }
 			Set-AppState $job.App.id 'pronto'
 			$script:done++
 		} else {
@@ -728,7 +739,7 @@ if( $apps.Count -gt 0 ) {
 	Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$sweepScript`" -Baseline `"$baselineFile`""
 }
 
-Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue
+if( -not $keepInstallers ) { Remove-Item -LiteralPath $offlineDir -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Log 'apps.log' ("FIM da lista de apps em {0:N0} min" -f ((Get-Date) - $started).TotalMinutes)
 
 #region tweak:sudo
