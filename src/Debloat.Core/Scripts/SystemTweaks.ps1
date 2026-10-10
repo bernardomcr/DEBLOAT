@@ -5,6 +5,12 @@ function Set-Policy([string] $Key, [string] $Name, [int] $Value) {
 	reg.exe add $Key /v $Name /t REG_DWORD /d $Value /f | Out-Null
 }
 
+#region busca-escondida
+# Busca da barra escondida (o Everything Toolbar entra no lugar). Só o SearchboxTaskbarMode do usuário não
+# bastou no 25H2 (a caixa "Pesquisar" voltava); a política "Search on the taskbar" (0 = esconder) vale sempre.
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search' 'SearchOnTaskbarMode' 0
+#endregion
+
 #region tweak:telemetria
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry' 0
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'DoNotShowFeedbackNotifications' 1
