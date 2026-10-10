@@ -25,7 +25,8 @@ public partial class App : Application
 
     if (e.Args.Length >= 2 && e.Args[0] == "--painel")
     {
-      StartPanel(e.Args[1], e.Args.Length >= 3 && int.TryParse(e.Args[2], out int parent) ? parent : 0);
+      // --abrir: já abre a lista (o teste na VM não tem como clicar no aviso).
+      StartPanel(e.Args[1], e.Args.Length >= 3 && int.TryParse(e.Args[2], out int parent) ? parent : 0, e.Args.Contains("--abrir"));
       return;
     }
     new MainWindow().Show();
@@ -35,7 +36,7 @@ public partial class App : Application
   /// Modo painel (primeiro login do Windows instalado pelo DEBLOAT, chamado pelo FirstLogon.ps1): aviso pequeno no
   /// canto; clicar abre a lista dos apps. "Minimizar" volta para o aviso. Fecha sozinho quando termina.
   /// </summary>
-  private void StartPanel(string statePath, int parentId)
+  private void StartPanel(string statePath, int parentId, bool openList)
   {
     ShutdownMode = ShutdownMode.OnExplicitShutdown;
     var vm = new PanelViewModel(statePath, parentId);
@@ -80,6 +81,7 @@ public partial class App : Application
     };
     vm.Start();
     notice.Show();
+    if (openList) OpenPanel();
 #if DEBUG
     // Só no desenvolvimento: DEBLOAT_PRINTS=<pasta> salva o aviso e a lista e fecha.
     if (Environment.GetEnvironmentVariable("DEBLOAT_PRINTS") is { Length: > 0 } prints)

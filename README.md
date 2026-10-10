@@ -16,7 +16,8 @@ pensado item por item, que dá para ajustar à vontade, ou usar sem mexer em nad
 ## O que ele faz
 
 - **Windows 11 oficial:** a versão pronta da Microsoft (ou, em teste, qualquer build via UUP dump), em português ou inglês.
-- **Instalação sem perguntas:** pendrive ou ISO que formata e instala sozinho, com conta local sem senha — ou
+- **Instalação quase sem perguntas:** pendrive ou ISO que só pergunta em qual disco instalar e faz o resto
+  sozinho, com conta local sem senha — ou
   **sem pendrive**: o DEBLOAT prepara uma partição temporária no próprio disco, reinicia e reinstala, e depois
   devolve o espaço ao C:.
 - **Debloat:** remove Copilot, Recall, Teams, Clipchamp, propaganda, telemetria e mais de 60 apps; mais de

@@ -25,6 +25,7 @@ Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\Privacy' 'TailoredExper
 #region tweak:recomendado-iniciar
 Set-UserValue 'Software\Policies\Microsoft\Windows\Explorer' 'HideRecommendedSection' 1   # a versão de máquina não vale no Pro
 Set-UserValue $adv 'Start_TrackProgs' 0                  # "apps adicionados recentemente"
+Set-UserValue $adv 'Start_IrisRecommendations' 0         # "Bem-vindo ao Windows"/dicas nas recomendações
 #endregion
 
 #region tweak:nunca-agrupar

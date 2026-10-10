@@ -39,6 +39,10 @@ Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'DisableGraphRece
 
 #region tweak:recomendado-iniciar
 Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'HideRecommendedSection' 1
+# No Pro, HideRecommendedSection só vale em "ambiente educacional" (o "Introdução" continuava, VM 09–10/10/2026).
+Set-Policy 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start' 'HideRecommendedSection' 1
+Set-Policy 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Education' 'IsEducationEnvironment' 1
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'HideRecentlyAddedApps' 1
 #endregion
 
 #region tweak:ia-windows

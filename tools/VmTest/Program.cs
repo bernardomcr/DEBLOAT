@@ -125,6 +125,26 @@ try
     string answer = Path.Combine(root, "autounattend-sem-pendrive.xml");
     File.WriteAllBytes(answer, new UnattendBuilder().BuildBytes(new DebloatOptions { Password = password }));
     string output = Path.Combine(root, $"sem-pendrive-{DateTime.Now:HHmmss}.log");
+    // --com-programas: põe na VM um programa do winget fora do catálogo (CMake) e um portátil registrado, e o
+    // InPlaceRun os leva como a aba Backup faria (o do winget reinstala, o portátil volta pela pasta + atalho).
+    bool withPrograms = args.Contains("--com-programas");
+    string prepare = withPrograms ? """
+          $p = 'C:\Ferramentas\TesteDEBLOAT'
+          New-Item -ItemType Directory -Force -Path $p | Out-Null
+          Copy-Item "$env:SystemRoot\System32\where.exe" "$p\TesteDEBLOAT.exe" -Force
+          'dados do programa portátil' | Set-Content "$p\dados.txt"
+          $k = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\TesteDEBLOAT'
+          New-Item -Path $k -Force | Out-Null
+          Set-ItemProperty $k DisplayName 'Teste DEBLOAT Portatil'
+          Set-ItemProperty $k InstallLocation $p
+          Set-ItemProperty $k DisplayIcon "$p\TesteDEBLOAT.exe"
+          $rel = Invoke-RestMethod 'https://api.github.com/repos/Kitware/CMake/releases/latest' -Headers @{ 'User-Agent' = 'DEBLOAT' }
+          $msi = ($rel.assets | Where-Object name -like '*windows-x86_64.msi' | Select-Object -First 1).browser_download_url
+          & curl.exe -L -s -o "$env:TEMP\cmake.msi" $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$env:TEMP\cmake.msi`" /qn" -Wait
+          "CMake instalado: $(Test-Path 'C:\Program Files\CMake\bin\cmake.exe')"
+      """ : "";
+    string runnerArgs = withPrograms ? $"--programas --senha {password}" : "";
     Log("Montando o disco extra com a instalação e o InPlaceRun");
     await Ps($$"""
       Get-VMHardDiskDrive -VMName '{{VmName}}' | Where-Object Path -eq '{{dataVhd}}' | Remove-VMHardDiskDrive
@@ -150,7 +170,8 @@ try
         $result = Invoke-Command -Session $s -ScriptBlock {
           Start-Sleep -Seconds 5   # o disco extra acabou de chegar
           $l = (Get-Volume -FileSystemLabel 'DEBLOAT-TESTE').DriveLetter
-          & "$($l):\InPlaceRun.exe" "$($l):\midia" 2>&1
+          {{prepare}}
+          & "$($l):\InPlaceRun.exe" "$($l):\midia" {{runnerArgs}} 2>&1
           "SAIDA=$LASTEXITCODE"
           Get-Partition | Format-Table DiskNumber, PartitionNumber, DriveLetter, Size, Type -AutoSize | Out-String
           bcdedit.exe /enum all | Out-String
@@ -223,7 +244,11 @@ try
     await Watch(watchScope, id);
     return;
   }
-  string esd = Directory.GetFiles(Path.Combine(root, "..", "cache"), "*.esd").Single();
+  // --uup <versão>: monta pelo UUP dump (ex.: 26H2) em vez do .esd da Microsoft. --pendrive <disco>: grava esse
+  // pendrive de verdade e a VM dá boot por ele (disco físico ligado direto na VM), em vez da ISO.
+  int uupAt = Array.IndexOf(args, "--uup");
+  int usbAt = Array.IndexOf(args, "--pendrive");
+  string? esd = uupAt >= 0 ? null : Directory.GetFiles(Path.Combine(root, "..", "cache"), "*.esd").Single();
   string media = Path.Combine(root, "midia");
   // ISO e disco ficam numa pasta do sistema: no 1º teste o Hyper-V disse "anexo não encontrado" com a ISO no AppData.
   string vmDir = Directory.CreateDirectory(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DEBLOAT-VM")).FullName;
@@ -249,10 +274,20 @@ try
     Log("Reaproveitando a mídia; só o autounattend.xml é novo");
     File.WriteAllBytes(Path.Combine(media, "autounattend.xml"), xml);
   }
+  else if (uupAt >= 0)
+  {
+    using var uupHttp = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+    var build = (await UupDump.ListBuildsAsync(uupHttp)).First(b => b.Version == args[uupAt + 1]);
+    Log($"UUP dump: {build.Title} ({build.Build})");
+    string work = Path.Combine(root, "..", "cache", $"uup-{build.Build}-pt-br");
+    string folder = await UupDump.BuildFolderAsync(uupHttp, build, "pt-br", work, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+    Log("Montando a mídia a partir da pasta convertida");
+    await MediaBuilder.BuildFromFolderAsync(folder, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+  }
   else
   {
     Log("Montando a mídia (preset padrão + apagar disco 0)");
-    await MediaBuilder.BuildAsync(esd, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+    await MediaBuilder.BuildAsync(esd!, media, "Professional", xml, new Progress<MediaStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
   }
   Log("Baixando os instaladores dos apps para a mídia");
   var appCatalog = AppCatalog.Load();
@@ -272,8 +307,21 @@ try
     Log("DEBLOAT.exe (painel) na mídia");
   }
   foreach (var stale in Directory.EnumerateFiles(shots)) File.Delete(stale);
-  Log("Gerando a ISO");
-  IsoWriter.Write(media, iso);
+  int usbDisk = usbAt >= 0 ? int.Parse(args[usbAt + 1]) : -1;
+  if (usbDisk >= 0)
+  {
+    // Igual ao app: drivers deste PC + gravação do pendrive (FAT32 de boot + NTFS de dados).
+    var drive = (await UsbWriter.ListAsync()).Single(d => d.Number == usbDisk);
+    Log($"Gravando o pendrive {drive.Label}");
+    await DriverExporter.ExportAsync(media);
+    await UsbWriter.WriteAsync(drive, media, new Progress<WriteStep>(s => Log($"  {s.Fraction:P0} {s.Text}")));
+    await Ps($"Set-Disk -Number {usbDisk} -IsOffline $true");   // a VM só aceita disco físico offline no PC
+  }
+  else
+  {
+    Log("Gerando a ISO");
+    IsoWriter.Write(media, iso);
+  }
 
   Log("Criando a VM");
   await Ps($$"""
@@ -284,13 +332,19 @@ try
     Set-VMKeyProtector -VMName '{{VmName}}' -NewLocalKeyProtector
     Enable-VMTPM -VMName '{{VmName}}'
     $vmId = (Get-VM -Name '{{VmName}}').Id
-    icacls.exe '{{iso}}' /grant "NT VIRTUAL MACHINE\$($vmId):(R)" | Out-Null
-    $dvd = $null
-    foreach( $try in 1..5 ) {
-      try { $dvd = Add-VMDvdDrive -VMName '{{VmName}}' -Path '{{iso}}' -Passthru; break }
-      catch { if( $try -eq 5 ) { throw }; Start-Sleep -Seconds 10 }   # antivírus ainda lendo a ISO recém-criada
+    if( {{usbDisk}} -ge 0 ) {
+      # Pendrive de verdade como disco físico, depois do disco virtual (o preset de teste apaga o disco 0).
+      $usb = Add-VMHardDiskDrive -VMName '{{VmName}}' -DiskNumber {{usbDisk}} -ControllerLocation 1 -Passthru
+      Set-VMFirmware -VMName '{{VmName}}' -FirstBootDevice $usb
+    } else {
+      icacls.exe '{{iso}}' /grant "NT VIRTUAL MACHINE\$($vmId):(R)" | Out-Null
+      $dvd = $null
+      foreach( $try in 1..5 ) {
+        try { $dvd = Add-VMDvdDrive -VMName '{{VmName}}' -Path '{{iso}}' -Passthru; break }
+        catch { if( $try -eq 5 ) { throw }; Start-Sleep -Seconds 10 }   # antivírus ainda lendo a ISO recém-criada
+      }
+      Set-VMFirmware -VMName '{{VmName}}' -FirstBootDevice $dvd
     }
-    Set-VMFirmware -VMName '{{VmName}}' -FirstBootDevice $dvd
     Set-VM -Name '{{VmName}}' -AutomaticCheckpointsEnabled $false -CheckpointType Disabled
     Start-VM -Name '{{VmName}}'
     """);
