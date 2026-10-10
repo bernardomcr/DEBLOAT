@@ -173,6 +173,17 @@ antes. Caminhos gravados com variáveis (`%APPDATA%`…) para funcionar com outr
 6. "Introdução" ainda aparece nas recomendações do Iniciar (HideRecommendedSection por máquina e por
    usuário e Start_TrackProgs não bastaram). Cosmético; investigar.
 
+## Rodada na VM com instaladores na mídia (10/10/2026)
+
+- Lista de apps inteira em **12 min** (antes 15–20), sendo 5 min só do .NET 3.5 (recurso do Windows, na fila).
+  48 instaladores vieram da mídia; WhatsApp/ChatGPT pela Loja com o bypass de certificado; OpenAL e
+  GameInput pelo winget. Wand e RustDesk OK. Game Bar removida (XboxGamingOverlay ausente). Janelas do
+  Discord, RustDesk e Tailscale fechadas sozinhas. Tarefas DEBLOAT-associacoes e DEBLOAT-taxa-maxima criadas.
+- ❌ PowerToys: o instalador **por usuário** saiu com 0 sem instalar (rodando como administrador). Agora o
+  download pede `--scope machine` primeiro e cai no normal se não houver ou se for zip/portátil
+  (Discord, VC++ AIO, Telegram). O ChatGPT da Loja aparece como pacote "OpenAI.Codex" — é o próprio app.
+- Ajustes pedidos depois de ver a VM: relógio sem segundos e bandeja com a setinha (^) no preset.
+
 ## Vídeo (10/10/2026)
 
 - **Limpeza do vídeo:** o DriverExporter nunca leva drivers de vídeo para o pendrive (só Net, disco, USB

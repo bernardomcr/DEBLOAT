@@ -25,6 +25,9 @@ public static partial class OfflineInstallers
 
   private static readonly TimeSpan CacheLife = TimeSpan.FromDays(3);
 
+  /// <summary>Muda quando a regra de escolha do instalador muda, para não reaproveitar o que foi baixado com a antiga.</summary>
+  private const string CacheVersion = "v3-machine";
+
   private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
   public static bool CanDownload(AppEntry app) => app.Source is "winget" or "url" or "github";
@@ -46,7 +49,7 @@ public static partial class OfflineInstallers
       try
       {
         progress?.Report(new(app.Id, OfflineState.Downloading));
-        string dir = Path.Combine(cacheDir, app.Id);
+        string dir = Path.Combine(cacheDir, CacheVersion, app.Id);
         var item = Cached(dir) ?? await DownloadAsync(http, app, dir, ct);
         if (item is null)
         {
@@ -103,9 +106,31 @@ public static partial class OfflineInstallers
 
   private static async Task<OfflineInstaller?> FromWingetAsync(AppEntry app, string dir, CancellationToken ct)
   {
+    // Primeiro a versão para todos os usuários: a por usuário do PowerToys, rodando como administrador no
+    // primeiro login, saía com 0 sem instalar nada (VM, 10/10/2026). Quem só tem por usuário (Discord) cai na normal.
+    foreach (string? scope in new[] { "machine", null })
+    {
+      if (!await WingetDownloadAsync(app, dir, scope, ct)) continue;
+      string? manifest = Directory.EnumerateFiles(dir, "*.yaml").FirstOrDefault();
+      string? installer = Directory.EnumerateFiles(dir).FirstOrDefault(f => !f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase));
+      // A versão "para todos" às vezes é zip/portátil (VC++ AIO, Telegram): aí tenta a normal.
+      if (manifest is null || installer is null || ParseManifest(File.ReadAllText(manifest)) is not { } plan) continue;
+      // Nome curto: os do winget têm espaços, parênteses e passam de 100 caracteres.
+      string file = app.Id + Path.GetExtension(installer);
+      File.Move(installer, Path.Combine(dir, file));
+      File.Delete(manifest);
+      return new OfflineInstaller(app.Id, file, plan.Kind, plan.Args, plan.SuccessCodes);
+    }
+    return null;
+  }
+
+  private static async Task<bool> WingetDownloadAsync(AppEntry app, string dir, string? scope, CancellationToken ct)
+  {
+    foreach (string f in Directory.EnumerateFiles(dir)) File.Delete(f);
     var args = new List<string> { "download", "--exact", "--id", app.Package, "--source", "winget", "--download-directory", dir,
       "--skip-dependencies", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity" };
     if (app.Architecture is not null) args.AddRange(["--architecture", app.Architecture]);
+    if (scope is not null) args.AddRange(["--scope", scope]);
     var psi = new ProcessStartInfo(WingetPath())
     {
       UseShellExecute = false,
@@ -121,18 +146,7 @@ public static partial class OfflineInstallers
     await p.WaitForExitAsync(ct);
     await stdout;
     await stderr;
-    if (p.ExitCode != 0) return null;
-
-    string? manifest = Directory.EnumerateFiles(dir, "*.yaml").FirstOrDefault();
-    string? installer = Directory.EnumerateFiles(dir).FirstOrDefault(f => !f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase));
-    if (manifest is null || installer is null) return null;
-    var plan = ParseManifest(File.ReadAllText(manifest));
-    if (plan is null) return null;
-    // Nome curto: os do winget têm espaços, parênteses e passam de 100 caracteres.
-    string file = app.Id + Path.GetExtension(installer);
-    File.Move(installer, Path.Combine(dir, file));
-    File.Delete(manifest);
-    return new OfflineInstaller(app.Id, file, plan.Value.Kind, plan.Value.Args, plan.Value.SuccessCodes);
+    return p.ExitCode == 0;
   }
 
   private static async Task<OfflineInstaller?> FromGitHubAsync(HttpClient http, AppEntry app, string dir, CancellationToken ct)
