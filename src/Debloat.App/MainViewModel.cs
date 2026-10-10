@@ -219,42 +219,63 @@ public partial class MainViewModel : ObservableObject
     _ => Versions.Count == 0 ? "Procurando versões..." : "",
   };
 
+  /// <summary>Ao abrir: primeiro as prontas da Microsoft (rápido, já dá para baixar), depois todas as builds do UUP dump.</summary>
   public async Task LoadReleasesAsync()
   {
     try
     {
       foreach (var r in await WindowsCatalog.LoadReleasesAsync(Http)) AddBuild(r.Version, new BuildOption(r.Build, r, null));
-      SelectedVersion = Versions.FirstOrDefault();
+      SortVersions();
+      SelectedVersion = Versions.FirstOrDefault(v => v.Builds.Any(b => b.Official is not null)) ?? Versions.FirstOrDefault();
       SelectedLanguage = Languages[0];
     }
     catch (Exception e)
     {
       Status = $"Não deu para buscar as versões do Windows: {e.Message}";
     }
+    await MergeUupAsync();
   }
 
   [RelayCommand]
-  private async Task RefreshBuilds() => await RunBusy(async () =>
+  private async Task RefreshBuilds() => await RunBusy(MergeUupAsync);
+
+  private async Task MergeUupAsync()
   {
-    Status = "Buscando todas as builds (UUP dump)...";
-    var keep = SelectedBuild;
-    foreach (var b in await UupDump.ListBuildsAsync(Http))
+    try
     {
-      var group = Versions.FirstOrDefault(v => v.Label == b.Version);
-      if (group?.Builds.Any(x => x.Build == b.Build) == true) continue;   // a pronta da Microsoft já está
-      AddBuild(b.Version, new BuildOption(b.Build, null, b));
+      var keep = SelectedBuild;
+      foreach (var b in await UupDump.ListBuildsAsync(Http))
+      {
+        var group = Versions.FirstOrDefault(v => v.Label == b.Version);
+        if (group?.Builds.Any(x => x.Build == b.Build) == true) continue;   // a pronta da Microsoft já está
+        AddBuild(b.Version, new BuildOption(b.Build, null, b));
+      }
+      SortVersions();
+      SelectedVersion = Versions.FirstOrDefault(v => keep is not null && v.Builds.Contains(keep)) ?? Versions.FirstOrDefault();
+      if (keep is not null && Builds.Contains(keep)) SelectedBuild = keep;
     }
-    var ordered = Versions.OrderBy(v => v.Label == "Insider").ThenByDescending(v => v.Builds.Max(b => b.Build)).ToList();
+    catch (Exception e)
+    {
+      Status = $"Não deu para buscar as outras builds (UUP dump): {e.Message}";
+    }
+  }
+
+  /// <summary>Mais nova primeiro pelo nome da versão (26H2 > 26H1 > 25H2), não pela build: a 26H1 tem build maior que a 26H2.</summary>
+  private void SortVersions()
+  {
+    var ordered = Versions.OrderByDescending(v => VersionRank(v.Label)).ToList();
     Versions.Clear();
     foreach (var v in ordered)
     {
       v.Builds.Sort((a, b) => b.Build.CompareTo(a.Build));
       Versions.Add(v);
     }
-    SelectedVersion = Versions.FirstOrDefault(v => v.Builds.Contains(keep!)) ?? Versions.FirstOrDefault();
-    SelectedBuild = keep is not null && Builds.Contains(keep) ? keep : Builds.FirstOrDefault();
-    Status = $"{Versions.Sum(v => v.Builds.Count)} builds disponíveis.";
-  });
+  }
+
+  public static int VersionRank(string label) =>
+    label.Length == 4 && int.TryParse(label[..2], out int year) && char.ToUpperInvariant(label[2]) == 'H' && char.IsDigit(label[3])
+      ? year * 10 + (label[3] - '0')
+      : -1;   // Insider e o que não for "AAHn" vão para o fim
 
   private void AddBuild(string version, BuildOption option)
   {
