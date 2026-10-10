@@ -220,7 +220,9 @@ ISO/pendrive. Sem textos explicativos na interface.
 - Excluir do Defender: descartado pelo usuário.
 - **Versões:** os instaladores são os mais novos do dia em que a mídia é montada (cache de 3 dias). Mídia com
   mais de 14 dias (`DEBLOAT\apps\criado.txt`) + internet → o primeiro login ignora e baixa tudo de novo.
-- Estimativa: lista de 12 min → ~8–9 min (5 deles do .NET 3.5). Conferir na rodada final da VM.
+- Medido na VM (10/10/2026): 12 min → **10,5 min**, porque o .NET 3.5 segurava a fila normal por 5 min.
+  Agora ele roda num processo à parte, ao lado das duas filas (aparece no aviso junto com os outros nomes):
+  estimativa ~5 min. Conferir na próxima rodada.
 
 ## Vídeo (10/10/2026)
 

@@ -530,7 +530,7 @@ $current = $null
 $done = 0
 
 function Update-Notice {
-	$names = @( @( $script:current ) + @( $script:running | ForEach-Object { $_.App.name } ) | Where-Object { $_ } )
+	$names = @( @( $script:current ) + @( $script:running | ForEach-Object { $_.App.name } ) + @( $script:featureJobs | Where-Object State -eq 'Running' | ForEach-Object Name ) | Where-Object { $_ } )
 	Set-Notice "Instalando apps: $script:done de $($apps.Count)" ($names -join ', ') -1
 }
 
@@ -591,12 +591,35 @@ $dependencies = @( $apps | ForEach-Object { $_.requires } | Where-Object { $_ } 
 foreach( $app in $apps ) {
 	$item = $offline[$app.id]
 	$linked = $app.requires -or ($app.id -in $dependencies)
+	if( $app.source -eq 'feature' ) { continue }   # vai num processo à parte (abaixo)
 	if( $item -and $item.parallel -and -not $item.signer -and -not $linked ) { $parallelQueue.Enqueue( $app ) } else { $serial += $app }
+}
+
+# Recursos do Windows (.NET 3.5, ~5 min) usam o mecanismo de componentes do sistema, não o Windows Installer:
+# rodam ao lado das duas filas. Sozinho na fila normal, o .NET 3.5 a segurava por 5 min (VM, 10/10/2026).
+$featureJobs = @( $apps | Where-Object source -eq 'feature' | ForEach-Object {
+	Write-Log 'apps.log' "Instalando $($_.name) (em paralelo)..."
+	Start-Job -Name $_.name -ArgumentList ${function:Enable-FromMedia}.ToString(), $_.package -ScriptBlock {
+		param( [string] $Body, [string] $Feature )
+		function Write-Log( $File, $Text ) { $Text }   # no processo à parte, as mensagens voltam como saída
+		& ([scriptblock]::Create( $Body )) $Feature
+	}
+} )
+
+function Receive-Features {
+	foreach( $job in @( $script:featureJobs | Where-Object { $_.State -notin 'Running', 'NotStarted' } ) ) {
+		foreach( $line in @( Receive-Job -Job $job -ErrorAction SilentlyContinue ) ) { Write-Log 'apps.log' "  $($job.Name): $line" }
+		if( $job.State -ne 'Completed' ) { Write-Log 'apps.log' "  $($job.Name): ERRO $($job.ChildJobs[0].JobStateInfo.Reason)" }
+		Remove-Job -Job $job -Force
+		$script:featureJobs = @( $script:featureJobs | Where-Object { $_ -ne $job } )
+		$script:done++
+	}
 }
 
 if( $apps.Count -gt 0 ) {
 	Start-Parallel
 	foreach( $app in $serial ) {
+		Receive-Features
 		Receive-Parallel
 		Close-NewWindows   # o que os apps que já terminaram abriram
 		$current = $app.name
@@ -605,7 +628,8 @@ if( $apps.Count -gt 0 ) {
 		$current = $null
 		$done++
 	}
-	while( $running.Count -gt 0 -or $parallelQueue.Count -gt 0 ) {
+	while( $running.Count -gt 0 -or $parallelQueue.Count -gt 0 -or $featureJobs.Count -gt 0 ) {
+		Receive-Features
 		Receive-Parallel
 		Close-NewWindows
 		Start-Parallel
