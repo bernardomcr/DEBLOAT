@@ -48,3 +48,28 @@ Set-UserValue 'Software\Microsoft\GameBar' 'AutoGameModeEnabled' 1
 #region tweak:jogos-janela
 reg.exe add 'HKU\DefaultUser\Software\Microsoft\DirectX\UserGpuPreferences' /v DirectXUserGlobalSettings /t REG_SZ /d 'SwapEffectUpgradeEnable=1;' /f | Out-Null
 #endregion
+
+#region tweak:sem-spotlight
+Set-UserValue 'Software\Policies\Microsoft\Windows\CloudContent' 'DisableWindowsSpotlightFeatures' 1
+#endregion
+
+#region tweak:sem-docs-recentes
+Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoRecentDocsHistory' 1
+#endregion
+
+#region tweak:sem-inicio-galeria
+Set-UserValue 'Software\Classes\CLSID\{e88865ea-0e1c-4e20-9aa6-edcd0212c87c}' 'System.IsPinnedToNameSpaceTree' 0   # Galeria
+Set-UserValue 'Software\Classes\CLSID\{f874310e-b6b7-47dc-bc84-b9e6b38f5903}' 'System.IsPinnedToNameSpaceTree' 0   # Início
+#endregion
+
+#region tweak:caminho-titulo
+Set-UserValue 'Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState' 'FullPath' 1
+#endregion
+
+#region tweak:iniciar-mais-fixados
+Set-UserValue $adv 'Start_Layout' 1
+#endregion
+
+#region tweak:sem-aero-shake
+Set-UserValue $adv 'DisallowShaking' 1
+#endregion

@@ -56,7 +56,7 @@ public sealed class UnattendBuilder
             CompactOs: false, SkipIntegrityCheck: false)
         : new DefaultPESettings(
             EditionSettings: new UnattendedEditionSettings(generator.Lookup<WindowsEdition>(options.Edition)),
-            BypassRequirementsCheck: true),
+            BypassRequirementsCheck: Has("ignorar-requisitos")),
       ActivationKey = options.WipeDisk0 ? new ProductKey(GenericKeys[options.Edition]) : null,
       Bloatwares = removed.Select(generator.Lookup<Bloatware>).ToImmutableList(),
       ExpressSettings = ExpressSettingsMode.DisableAll,
@@ -81,6 +81,16 @@ public sealed class UnattendBuilder
       PreventDeviceApps = Has("sem-apps-fabricante"),
       DeleteWindowsOld = Has("apagar-windows-old"),
       TurnOffSystemSounds = Has("sem-sons"),
+      DisableAutomaticRestartSignOn = Has("sem-login-apos-reinicio"),
+      HardenSystemDriveAcl = Has("acl-endurecida"),
+      EnableRemoteDesktop = Has("rdp"),
+      DisableSystemRestore = Has("sem-restauracao"),
+      HideInfoTip = Has("sem-dicas-mouse"),
+      DeleteJunctions = Has("sem-junctions"),
+      VBoxGuestAdditions = Has("vm-virtualbox"),
+      VMwareTools = Has("vm-vmware"),
+      VirtIoGuestTools = Has("vm-virtio"),
+      ParallelsTools = Has("vm-parallels"),
       HideEdgeFre = Has("edge-boas-vindas"),
       DisableEdgeStartupBoost = Has("edge-segundo-plano"),
       MakeEdgeUninstallable = Has("edge-desinstalavel"),
@@ -88,27 +98,35 @@ public sealed class UnattendBuilder
       ClassicContextMenu = Has("menu-classico"),
       LaunchToThisPC = Has("abrir-este-computador"),
       ShowFileExtensions = Has("mostrar-extensoes"),
-      HideFiles = Has("mostrar-ocultos") ? HideModes.HiddenSystem : HideModes.Hidden,
+      HideFiles = Has("mostrar-arquivos-sistema") ? HideModes.None : Has("mostrar-ocultos") ? HideModes.HiddenSystem : HideModes.Hidden,
       ShowEndTask = Has("finalizar-tarefa"),
       ShowAllTrayIcons = Has("todos-icones-bandeja"),
       LeftTaskbar = Has("barra-esquerda"),
       HideTaskViewButton = Has("sem-visao-tarefas"),
       DisableBingResults = Has("pesquisa-web"),
-      TaskbarSearch = everythingToolbar ? TaskbarSearchMode.Hide : TaskbarSearchMode.Box,
+      TaskbarSearch = everythingToolbar ? TaskbarSearchMode.Hide : Has("busca-icone") ? TaskbarSearchMode.Icon : TaskbarSearchMode.Box,
       StartPinsSettings = Has("iniciar-vazio") ? new EmptyStartPinsSettings() : new DefaultStartPinsSettings(),
       TaskbarIcons = Has("barra-so-explorador") ? new CustomTaskbarIcons(TaskbarExplorerOnly) : new DefaultTaskbarIcons(),
-      DesktopIcons = Has("icones-area-trabalho")
-        ? new CustomDesktopIconSettings(new Dictionary<DesktopIcon, bool>
-          {
-            [generator.Lookup<DesktopIcon>("ThisPC")] = true,
-            [generator.Lookup<DesktopIcon>("RecycleBin")] = true,
-          })
-        : new DefaultDesktopIconSettings(),
-      ColorSettings = Has("modo-escuro")
-        ? new CustomColorSettings(ColorTheme.Dark, ColorTheme.Dark, EnableTransparency: true,
-            AccentColorOnStart: false, AccentColorOnBorders: false, AccentColor: Color.FromArgb(0x00, 0x78, 0xD4))
+      DesktopIcons = new CustomDesktopIconSettings(DesktopIconIds
+        .ToDictionary(i => generator.Lookup<DesktopIcon>(i.Icon), i => Has(i.Tweak))),
+      StartFolderSettings = StartFolderIds.Any(id => Has("pasta-" + id))
+        ? new CustomStartFolderSettings(StartFolderIds.ToDictionary(id => generator.StartFolders[id], id => Has("pasta-" + id)))
+        : new DefaultStartFolderSettings(),
+      LockKeySettings = Has("num-lock") || Has("sem-caps-lock")
+        ? new ConfigureLockKeySettings(
+            CapsLock: new LockKeySetting(LockKeyInitial.Off, Has("sem-caps-lock") ? LockKeyBehavior.Ignore : LockKeyBehavior.Toggle),
+            NumLock: new LockKeySetting(Has("num-lock") ? LockKeyInitial.On : LockKeyInitial.Off, LockKeyBehavior.Toggle),
+            ScrollLock: new LockKeySetting(LockKeyInitial.Off, LockKeyBehavior.Toggle))
+        : new SkipLockKeySettings(),
+      ColorSettings = Has("modo-escuro") || Has("cor-destaque-barra") || Has("sem-transparencia")
+        ? new CustomColorSettings(
+            Has("modo-escuro") ? ColorTheme.Dark : ColorTheme.Light, Has("modo-escuro") ? ColorTheme.Dark : ColorTheme.Light,
+            EnableTransparency: !Has("sem-transparencia"), AccentColorOnStart: Has("cor-destaque-barra"), AccentColorOnBorders: false,
+            AccentColor: Color.FromArgb(0x00, 0x78, 0xD4))
         : new DefaultColorSettings(),
-      Effects = Has("efeitos-desempenho") ? new BestPerformanceEffects() : new DefaultEffects(),
+      Effects = Has("efeitos-desempenho") ? new BestPerformanceEffects()
+        : Has("sem-animacoes") ? new CustomEffects(Enum.GetValues<Effect>().ToImmutableDictionary(e => e, e => !Animations.Contains(e)))
+        : new DefaultEffects(),
       DisablePointerPrecision = Has("mouse-sem-aceleracao"),
       StickyKeysSettings = Has("sem-teclas-aderentes") ? new DisabledStickyKeysSettings() : new DefaultStickyKeysSettings(),
     };
@@ -118,7 +136,9 @@ public sealed class UnattendBuilder
 
   private static List<Script> Scripts(DebloatOptions options, IReadOnlyList<AppEntry> apps, bool vlc)
   {
-    var tweaks = options.EffectiveTweaks;
+    var tweaks = options.Has("sem-restauracao")
+      ? options.EffectiveTweaks.Where(t => t != "ponto-restauracao").ToHashSet()
+      : options.EffectiveTweaks;
     string associations = Associations(vlc, options.Has("visualizador-fotos"));
     var named = associations.Length > 0 ? new HashSet<string> { "associacoes" } : new HashSet<string>();
 
@@ -137,6 +157,17 @@ public sealed class UnattendBuilder
     scripts.Add(new(firstLogon, ScriptPhase.FirstLogon, ScriptType.Ps1));
     return scripts;
   }
+
+  private static readonly (string Tweak, string Icon)[] DesktopIconIds =
+    [("icone-este-computador", "ThisPC"), ("icone-lixeira", "RecycleBin"), ("icone-pasta-usuario", "UserFiles"),
+     ("icone-painel-controle", "ControlPanel"), ("icone-rede", "Network")];
+
+  private static readonly string[] StartFolderIds =
+    ["Settings", "FileExplorer", "Downloads", "Documents", "Pictures", "Music", "Videos", "Network", "PersonalFolder"];
+
+  private static readonly Effect[] Animations =
+    [Effect.ControlAnimations, Effect.AnimateMinMax, Effect.TaskbarAnimations, Effect.MenuAnimation, Effect.TooltipAnimation,
+     Effect.SelectionFade, Effect.ComboBoxAnimation, Effect.ListBoxSmoothScrolling];
 
   private static readonly string[] VideoAudio =
     [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".m2ts", ".3gp",

@@ -18,10 +18,13 @@ public record WindowsRelease(string Version, Version Build, IReadOnlyList<EsdFil
 
   public EsdFile? FileFor(string language, string architecture = "x64") => WindowsCatalog.Pick(Files, language, architecture);
 
-  /// <summary>Idiomas com a edição Pro em x64, com o nome no próprio idioma ("português (Brasil)").</summary>
+  /// <summary>Idiomas oferecidos: só português e inglês (decisão do usuário), se existirem nesta versão.</summary>
+  public static readonly IReadOnlyList<string> OfferedLanguages = ["pt-br", "en-us"];
+
   public IReadOnlyList<WindowsLanguage> Languages => Files
     .Where(f => f.Architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) && f.Edition.Equals("Professional", StringComparison.OrdinalIgnoreCase))
     .Select(f => f.Language.ToLowerInvariant()).Distinct()
+    .Where(code => OfferedLanguages.Contains(code))
     .Select(code => new WindowsLanguage(code, NativeName(code)))
     .OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
 

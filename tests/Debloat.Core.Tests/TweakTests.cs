@@ -57,3 +57,28 @@ public class TweakTests
     Assert.Contains("EnableLUA", tudo);                       // UAC desligado
   }
 }
+
+public class EveryTweakDoesSomethingTests
+{
+  private static readonly UnattendBuilder Builder = new();
+  private static readonly string Baseline = Gen(new HashSet<string>());
+
+  private static string Gen(HashSet<string> tweaks) =>
+    Encoding.UTF8.GetString(Builder.BuildBytes(new DebloatOptions { Tweaks = tweaks, RemovedApps = new HashSet<string>(), SelectedApps = ["chrome"] }));
+
+  public static IEnumerable<object[]> Ids => TweakCatalog.All.Select(t => new object[] { t.Id });
+
+  [Theory]
+  [MemberData(nameof(Ids))]
+  public void Ligar_o_ajuste_muda_o_xml(string id) => Assert.NotEqual(Baseline, Gen([id]));
+
+  [Fact]
+  public void Todo_app_removivel_existe_no_gerador()
+  {
+    foreach (var (id, _, _) in TweakCatalog.Bloatware)
+    {
+      string xml = Encoding.UTF8.GetString(Builder.BuildBytes(new DebloatOptions { RemovedApps = new HashSet<string> { id }, Tweaks = new HashSet<string>(), SelectedApps = ["vlc"] }));
+      Assert.NotEqual(Baseline, xml);
+    }
+  }
+}

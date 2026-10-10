@@ -39,6 +39,10 @@ foreach( $svc in 'DiagTrack', 'dmwappushservice' ) {
 
 powercfg.exe /setactive SCHEME_BALANCED
 
+#region tweak:desktop-sem-suspensao
+powercfg.exe /change standby-timeout-ac 0
+#endregion
+
 #region tweak:sem-hibernacao
 powercfg.exe /hibernate off
 #endregion

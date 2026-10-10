@@ -72,7 +72,6 @@ public static class TweakCatalog
     new("nunca-agrupar", "Barra de tarefas e Iniciar", "Nunca agrupar janelas na barra", "", true),
     new("segundos-relogio", "Barra de tarefas e Iniciar", "Segundos no relógio", "", true),
     new("todos-icones-bandeja", "Barra de tarefas e Iniciar", "Todos os ícones da bandeja visíveis", "", true),
-    new("icones-area-trabalho", "Barra de tarefas e Iniciar", "Este Computador e Lixeira na área de trabalho", "", true),
     new("modo-escuro", "Barra de tarefas e Iniciar", "Modo escuro", "", true),
 
     // Jogos
@@ -95,6 +94,79 @@ public static class TweakCatalog
     new("sem-teclas-aderentes", "Sistema", "Sem Teclas de Aderência (Shift 5 vezes)", "", true),
     new("efeitos-desempenho", "Sistema", "Efeitos visuais no modo desempenho", "Sem animações e sombras; o Windows fica mais feio", false, aggressive: true),
     new("sem-sons", "Sistema", "Desligar os sons do sistema", "", false),
+
+    // Mais privacidade (Políticas de Grupo)
+    new("sem-historico-clipboard", "Privacidade", "Desligar histórico da área de transferência (Win+V)", "", false),
+    new("sem-notificacoes-bloqueio", "Privacidade", "Sem notificações na tela de bloqueio", "", false),
+    new("sem-proximidade", "Privacidade", "Desligar Compartilhamento por Proximidade", "Também afeta o Vincular ao Celular", false),
+    new("sem-localizacao", "Privacidade", "Desligar a localização do Windows", "Fuso horário automático, clima e mapas param de funcionar", false, aggressive: true),
+    new("sem-apps-segundo-plano", "Privacidade", "Bloquear apps da Loja em segundo plano", "WhatsApp e alarmes param de notificar com o app fechado", false, aggressive: true),
+
+    // Mais propaganda
+    new("bloquear-onedrive", "Propaganda e sugestões", "Impedir o OneDrive mesmo se reinstalado", "", false),
+    new("sem-spotlight", "Propaganda e sugestões", "Sem Windows Spotlight (fotos e dicas na tela de bloqueio)", "", false),
+
+    // Mais Windows Update
+    new("sem-drivers-update", "Windows Update", "Não baixar drivers pelo Windows Update", "Drivers só do fabricante; o PC novo pode ficar sem algum driver", false),
+    new("sem-update-loja", "Windows Update", "Não atualizar apps da Loja sozinho", "Calculadora, Terminal, codecs e winget ficam desatualizados", false, aggressive: true),
+    new("update-avisar", "Windows Update", "Só avisar antes de baixar atualizações", "Na prática muita gente nunca atualiza", false, aggressive: true),
+
+    // Mais segurança
+    new("sem-autoplay", "Segurança", "Desligar Reprodução Automática (pendrive, CD)", "Evita vírus que se executam ao conectar um pendrive", false),
+    new("ignorar-requisitos", "Segurança", "Instalar mesmo sem TPM 2.0 / CPU suportada", "", true),
+    new("sem-login-apos-reinicio", "Segurança", "Não entrar sozinho na conta depois de um reinício do Update", "", false),
+    new("acl-endurecida", "Segurança", "Endurecer permissões da unidade C:", "Usuários comuns não criam pastas na raiz do C:", false),
+    new("rdp", "Segurança", "Permitir conexões de Área de Trabalho Remota (RDP)", "Para acessar este PC de outro; abre a porta 3389", false),
+
+    // Mais Explorador
+    new("mostrar-arquivos-sistema", "Explorador de Arquivos", "Mostrar também os arquivos protegidos do sistema", "Fácil apagar algo importante por engano", false, aggressive: true),
+    new("sem-docs-recentes", "Explorador de Arquivos", "Não guardar documentos recentes", "Somem os Recentes e as listas de atalhos dos programas", false),
+    new("sem-inicio-galeria", "Explorador de Arquivos", "Tirar \"Início\" e \"Galeria\" do painel lateral", "", false),
+    new("caminho-titulo", "Explorador de Arquivos", "Caminho completo na barra de título", "", false),
+    new("sem-dicas-mouse", "Explorador de Arquivos", "Sem balões de descrição ao passar o mouse", "", false),
+    new("sem-junctions", "Explorador de Arquivos", "Apagar atalhos ocultos antigos (\"Documents and Settings\" etc.)", "", false),
+
+    // Mais barra de tarefas
+    new("busca-icone", "Barra de tarefas e Iniciar", "Busca da barra só como ícone", "Sem o Everything Toolbar", false),
+    new("iniciar-mais-fixados", "Barra de tarefas e Iniciar", "Iniciar com mais espaço para fixados", "", false),
+    new("sem-aero-shake", "Barra de tarefas e Iniciar", "Desligar \"sacudir janela para minimizar as outras\"", "", false),
+    new("cor-destaque-barra", "Barra de tarefas e Iniciar", "Cor de destaque no Iniciar e na barra", "", false),
+    new("sem-transparencia", "Barra de tarefas e Iniciar", "Sem transparência", "", false),
+
+    // Área de trabalho
+    new("icone-este-computador", "Área de trabalho", "Ícone Este Computador", "", true),
+    new("icone-lixeira", "Área de trabalho", "Ícone Lixeira", "", true),
+    new("icone-pasta-usuario", "Área de trabalho", "Ícone da pasta do usuário", "", false),
+    new("icone-painel-controle", "Área de trabalho", "Ícone Painel de Controle", "", false),
+    new("icone-rede", "Área de trabalho", "Ícone Rede", "", false),
+
+    // Pastas no Iniciar (ao lado do botão de desligar)
+    new("pasta-Settings", "Pastas no Iniciar", "Configurações", "", false),
+    new("pasta-FileExplorer", "Pastas no Iniciar", "Explorador de Arquivos", "", false),
+    new("pasta-Downloads", "Pastas no Iniciar", "Downloads", "", false),
+    new("pasta-Documents", "Pastas no Iniciar", "Documentos", "", false),
+    new("pasta-Pictures", "Pastas no Iniciar", "Imagens", "", false),
+    new("pasta-Music", "Pastas no Iniciar", "Músicas", "", false),
+    new("pasta-Videos", "Pastas no Iniciar", "Vídeos", "", false),
+    new("pasta-Network", "Pastas no Iniciar", "Rede", "", false),
+    new("pasta-PersonalFolder", "Pastas no Iniciar", "Pasta pessoal", "", false),
+
+    // Teclado
+    new("num-lock", "Teclado", "Num Lock ligado ao iniciar", "", false),
+    new("sem-caps-lock", "Teclado", "Desativar a tecla Caps Lock", "", false),
+
+    // Mais sistema
+    new("sem-animacoes", "Sistema", "Sem animações de janela e menus", "Fica mais ágil e mantém fontes suaves e miniaturas", false),
+    new("desktop-sem-suspensao", "Sistema", "Nunca suspender sozinho", "A tela ainda desliga; bom para downloads e servidores de jogos", false),
+    new("sem-nomes-8dot3", "Sistema", "Sem nomes curtos 8.3 no NTFS", "Pastas com muitos arquivos ficam mais rápidas", false),
+    new("sem-compatibilidade", "Sistema", "Desligar mecanismo de compatibilidade e SwitchBack", "Programas e jogos antigos podem parar de abrir", false, aggressive: true),
+    new("sem-restauracao", "Sistema", "Desligar Proteção do Sistema (pontos de restauração)", "Sem como voltar o Windows sem formatar", false, aggressive: true),
+
+    // Máquina virtual (quando o Windows vai rodar dentro de uma VM)
+    new("vm-virtualbox", "Máquina virtual", "Instalar Guest Additions do VirtualBox", "", false),
+    new("vm-vmware", "Máquina virtual", "Instalar VMware Tools", "", false),
+    new("vm-virtio", "Máquina virtual", "Instalar drivers VirtIO e QEMU Guest Agent", "", false),
+    new("vm-parallels", "Máquina virtual", "Instalar Parallels Tools", "", false),
   ];
 
   public static Tweak Get(string id) => All.FirstOrDefault(t => t.Id == id) ?? throw new ArgumentException($"Ajuste '{id}' não existe.");
@@ -125,5 +197,10 @@ public static class TweakCatalog
     ("RemoveVoiceRecorder", "Gravador de Som", _ => false), ("RemoveCamera", "Câmera", _ => false), ("RemoveClock", "Relógio", _ => false),
     ("RemoveCalculator", "Calculadora", _ => false), ("RemoveSnippingTool", "Ferramenta de Captura", _ => false), ("RemovePaint", "Paint", _ => false),
     ("RemoveWindowsTerminal", "Terminal", _ => false), ("RemoveStore", "Microsoft Store (quebra WhatsApp e ChatGPT)", _ => false),
+    ("RemoveInternetExplorer", "Modo Internet Explorer", _ => false), ("RemoveWordPad", "WordPad", _ => false),
+    ("RemovePowerShell2", "PowerShell 2.0 (antigo)", _ => false), ("RemoveGameAssist", "Assistente de jogos do Edge", _ => false),
+    ("RemovePowerShellISE", "PowerShell ISE", _ => false), ("RemoveOpenSSHClient", "Cliente OpenSSH", _ => false),
+    ("RemoveWindowsMediaPlayer", "Windows Media Player clássico", _ => false), ("RemoveNotepadClassic", "Bloco de Notas clássico", _ => false),
+    ("RemoveMediaFeatures", "Recursos de mídia (quebra apps de vídeo)", _ => false),
   ];
 }

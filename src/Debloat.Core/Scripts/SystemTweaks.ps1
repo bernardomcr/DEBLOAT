@@ -122,6 +122,59 @@ Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice' 'AllowFindMyDevice' 0
 reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' /v ActiveOverlayAcPowerScheme /t REG_SZ /d 'ded574b5-45a0-4f42-8737-46345c09c238' /f | Out-Null
 #endregion
 
+#region tweak:sem-historico-clipboard
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'AllowClipboardHistory' 0
+#endregion
+
+#region tweak:sem-notificacoes-bloqueio
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'DisableLockScreenAppNotifications' 1
+#endregion
+
+#region tweak:sem-proximidade
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System' 'EnableCdp' 0
+#endregion
+
+#region tweak:sem-localizacao
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors' 'DisableLocation' 1
+#endregion
+
+#region tweak:sem-apps-segundo-plano
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy' 'LetAppsRunInBackground' 2
+#endregion
+
+#region tweak:bloquear-onedrive
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive' 'DisableFileSyncNGSC' 1
+#endregion
+
+#region tweak:sem-drivers-update
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' 'ExcludeWUDriversInQualityUpdate' 1
+#endregion
+
+#region tweak:sem-update-loja
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\WindowsStore' 'AutoDownload' 2
+#endregion
+
+#region tweak:update-avisar
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' 'NoAutoUpdate' 0
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' 'AUOptions' 2
+#endregion
+
+#region tweak:sem-autoplay
+Set-Policy 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoDriveTypeAutoRun' 255
+Set-Policy 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoAutorun' 1
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' 'NoAutoplayfornonVolume' 1
+#endregion
+
+#region tweak:sem-compatibilidade
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat' 'DisableEngine' 1
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat' 'SbEnable' 0
+Set-Policy 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat' 'DisablePCA' 1
+#endregion
+
+#region tweak:sem-nomes-8dot3
+fsutil.exe behavior set disable8dot3 1 | Out-Null
+#endregion
+
 #region associacoes
 # Programas padrão (VLC, Visualizador de Fotos) pela política oficial de associações. Ela vale em todo login:
 # o FirstLogon agenda a remoção depois que o VLC já estiver instalado, para o usuário poder trocar depois.
